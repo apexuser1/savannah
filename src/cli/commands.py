@@ -11,11 +11,127 @@ from src.parsers.resume_parser import ResumeParser
 from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
 
+SUPPORTED_FILE_TYPES = {".pdf", ".docx", ".txt", ".md"}
+
 
 def _coalesce_score(value):
     if isinstance(value, (int, float)):
         return float(value)
     return 0.0
+
+
+def _find_job_description(job_dir: Path) -> Path:
+    candidates = sorted(
+        [
+            path for path in job_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in SUPPORTED_FILE_TYPES
+        ],
+        key=lambda path: path.name.lower()
+    )
+    if not candidates:
+        raise ValueError(f"No job description file found in {job_dir}")
+    if len(candidates) > 1:
+        names = ", ".join(path.name for path in candidates)
+        raise ValueError(f"Multiple job description files found in {job_dir}: {names}")
+    return candidates[0]
+
+
+def _find_application_files(app_dir: Path) -> list[Path]:
+    if not app_dir.is_dir():
+        raise ValueError(f"Applications folder not found: {app_dir}")
+    return sorted(
+        [
+            path for path in app_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in SUPPORTED_FILE_TYPES
+        ],
+        key=lambda path: path.name.lower()
+    )
+
+
+def _create_job_from_file(db, file_path: Path) -> Job:
+    parser = JobParser()
+    job_data = parser.parse_file(str(file_path))
+
+    basics = job_data.get('basics', {})
+    title = basics.get('title', 'Unknown Position')
+    company = basics.get('company', 'Unknown Company')
+    location_data = basics.get('location', {})
+    location = location_data.get('city', '') if location_data else ''
+
+    job = Job(
+        job_data=job_data,
+        title=title,
+        company=company,
+        location=location,
+        original_filename=file_path.name,
+        file_type=file_path.suffix.lower()[1:]
+    )
+
+    db.add(job)
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception:
+        db.rollback()
+        raise
+
+    return job
+
+
+def _create_application_from_file(db, file_path: Path, job: Job):
+    parser = ResumeParser()
+    resume_data = parser.parse_file(str(file_path))
+
+    basics = resume_data.get('basics', {})
+    name = basics.get('name', 'Unknown')
+    email = basics.get('email')
+    phone = basics.get('phone')
+
+    candidate = Candidate(
+        resume_data=resume_data,
+        name=name,
+        email=email,
+        phone=phone,
+        original_filename=file_path.name,
+        file_type=file_path.suffix.lower()[1:]
+    )
+
+    db.add(candidate)
+    try:
+        db.commit()
+        db.refresh(candidate)
+    except Exception:
+        db.rollback()
+        raise
+
+    match_data = match_candidate_to_job(resume_data, job.job_data)
+
+    overall_score = _coalesce_score(match_data.get('overall_score'))
+    must_have_score = _coalesce_score(match_data.get('must_have_skills', {}).get('score'))
+    nice_to_have_score = _coalesce_score(match_data.get('nice_to_have_skills', {}).get('score'))
+    experience_score = _coalesce_score(match_data.get('minimum_years_experience', {}).get('score'))
+    education_score = _coalesce_score(match_data.get('required_education', {}).get('score'))
+
+    application = Application(
+        candidate_id=candidate.id,
+        job_id=job.id,
+        match_data=match_data,
+        overall_score=overall_score,
+        must_have_skills_score=must_have_score,
+        nice_to_have_skills_score=nice_to_have_score,
+        experience_score=experience_score,
+        education_score=education_score
+    )
+
+    db.add(application)
+    try:
+        db.commit()
+        db.refresh(application)
+    except Exception:
+        db.rollback()
+        raise
+
+    return candidate, application, match_data
 
 
 @click.group()
@@ -191,6 +307,115 @@ def upload_job(file_path: str):
         logger.error(f"Failed to upload job: {e}")
         click.echo(click.style(f"✗ Error: {e}", fg="red"))
         raise click.Abort()
+
+
+@cli.command()
+@click.argument('directory_path', type=click.Path(exists=True, file_okay=False))
+def directory_load(directory_path: str):
+    """
+    Load job folders and applications from a directory.
+
+    DIRECTORY_PATH: Path containing job directories. Each job folder must include
+    one job description file and an applications/ folder with resumes.
+    """
+    db = None
+    errors = []
+    total_jobs = 0
+    total_applications = 0
+
+    try:
+        init_database()
+        db = get_db_session()
+
+        base_dir = Path(directory_path)
+        job_dirs = sorted(
+            [path for path in base_dir.iterdir() if path.is_dir()],
+            key=lambda path: path.name.lower()
+        )
+
+        if not job_dirs:
+            errors.append(f"No job directories found in {base_dir}")
+        else:
+            for job_dir in job_dirs:
+                click.echo(f"\nProcessing job folder: {job_dir.name}")
+
+                try:
+                    job_description = _find_job_description(job_dir)
+                except Exception as exc:
+                    error_msg = f"{job_dir.name}: {exc}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    continue
+
+                try:
+                    job = _create_job_from_file(db, job_description)
+                    total_jobs += 1
+                    click.echo(
+                        f"  Job created (ID: {job.id}) from {job_description.name}"
+                    )
+                except Exception as exc:
+                    error_msg = (
+                        f"{job_dir.name}: Failed to create job from "
+                        f"{job_description.name}: {exc}"
+                    )
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    continue
+
+                app_dir = job_dir / "applications"
+                try:
+                    application_files = _find_application_files(app_dir)
+                except Exception as exc:
+                    error_msg = f"{job_dir.name}: {exc}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    continue
+
+                if not application_files:
+                    error_msg = f"{job_dir.name}: No applications found in {app_dir}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    continue
+
+                for application_file in application_files:
+                    click.echo(
+                        f"  Processing application: {application_file.name}"
+                    )
+                    try:
+                        candidate, application, _ = _create_application_from_file(
+                            db, application_file, job
+                        )
+                        total_applications += 1
+                        click.echo(
+                            f"    Application created (ID: {application.id}) "
+                            f"Candidate: {candidate.name}"
+                        )
+                    except Exception as exc:
+                        error_msg = (
+                            f"{job_dir.name}/{application_file.name}: {exc}"
+                        )
+                        logger.error(error_msg)
+                        errors.append(error_msg)
+
+        click.echo("\nSummary:")
+        click.echo(f"jobs: {total_jobs}")
+        click.echo(f"applications: {total_applications}")
+        if errors:
+            click.echo(f"status: errors: {len(errors)}")
+            for error in errors:
+                click.echo(f"  {error}")
+        else:
+            click.echo("status: success")
+
+    except click.Abort:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to load directory: {e}")
+        click.echo(click.style(f"Error: {e}", fg="red"))
+        raise click.Abort()
+    finally:
+        if db is not None:
+            db.close()
 
 
 @cli.command()
