@@ -1,0 +1,105 @@
+ALEX JOHNSON
+Software Engineer
+
+Email: alex.johnson@email.com
+Phone: (555) 123-4567
+LinkedIn: linkedin.com/in/alexjohnson
+GitHub: github.com/alexjdev
+Location: Austin, TX
+
+═══════════════════════════════════════════════════════════════
+
+PROFESSIONAL SUMMARY
+
+Motivated Software Engineer with 4 years of experience developing web applications using modern frameworks and technologies. Strong foundation in Python and React with a focus on creating user-friendly interfaces and efficient backend systems. Passionate about learning new technologies and contributing to team success.
+
+═══════════════════════════════════════════════════════════════
+
+TECHNICAL SKILLS
+
+Programming Languages: Python, JavaScript, HTML/CSS, Java
+Frontend: React, Redux, jQuery, Bootstrap, Material-UI
+Backend: Flask, Django, Node.js, Express
+Databases: PostgreSQL, MySQL, MongoDB
+APIs: REST API design and integration
+Cloud Services: AWS (EC2, S3 - basic usage)
+Version Control: Git, GitHub, Bitbucket
+Other: Agile/Scrum, JIRA, Unit Testing (pytest, Jest)
+
+═══════════════════════════════════════════════════════════════
+
+PROFESSIONAL EXPERIENCE
+
+Software Engineer | DataFlow Systems | Austin, TX
+March 2021 - Present (3 years, 9 months)
+
+• Developed and maintained web applications using Python (Flask) and React
+• Built RESTful APIs serving over 10,000 daily requests with average response time under 200ms
+• Designed and optimized PostgreSQL database schemas supporting multi-tenant architecture
+• Collaborated with UX designers to implement responsive React components used across 15+ pages
+• Integrated third-party APIs including payment processing and authentication services
+• Participated in code reviews and contributed to improving team coding standards
+• Worked in Agile environment with 2-week sprint cycles
+• Wrote unit and integration tests achieving 75% code coverage
+• Deployed applications to AWS EC2 instances and managed S3 buckets for file storage
+• Reduced page load times by 40% through frontend optimization techniques
+
+Key Projects:
+- Customer Dashboard: Built real-time analytics dashboard using React and Python backend
+- API Gateway: Developed centralized REST API service handling authentication and routing
+- Database Migration: Led migration from MySQL to PostgreSQL, improving query performance by 35%
+
+Junior Developer | WebCraft Solutions | Austin, TX
+June 2020 - February 2021 (9 months)
+
+• Assisted in developing client websites using React and Django
+• Fixed bugs and implemented minor feature requests
+• Wrote documentation for internal APIs and coding guidelines
+• Participated in daily standups and sprint planning meetings
+• Learned PostgreSQL database design and SQL query optimization
+• Contributed to frontend component library used across multiple projects
+
+═══════════════════════════════════════════════════════════════
+
+EDUCATION
+
+Bachelor of Science in Information Systems
+University of Texas at Austin | Graduated: May 2020
+GPA: 3.6/4.0
+
+Relevant Coursework:
+• Database Management Systems
+• Web Application Development
+• Software Engineering Principles
+• Data Structures and Algorithms
+• Systems Analysis and Design
+
+═══════════════════════════════════════════════════════════════
+
+PERSONAL PROJECTS
+
+Task Management App
+• Built full-stack application using React frontend and Python/Flask backend
+• Implemented user authentication, real-time updates, and data persistence
+• Deployed on AWS with PostgreSQL database
+
+Weather Dashboard
+• Created React-based weather application consuming third-party REST APIs
+• Implemented responsive design working across desktop and mobile devices
+
+═══════════════════════════════════════════════════════════════
+
+CERTIFICATIONS & TRAINING
+
+• AWS Certified Cloud Practitioner (2022)
+• React - The Complete Guide (Udemy, 2021)
+• Python for Data Science (Coursera, 2020)
+
+═══════════════════════════════════════════════════════════════
+
+ADDITIONAL INFORMATION
+
+• Active contributor to open-source projects on GitHub
+• Regular attendee of Austin JavaScript and Python meetups
+• Enjoy mentoring beginners through local coding bootcamp as volunteer
+• Strong problem-solving skills and ability to work independently or in teams

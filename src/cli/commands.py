@@ -5,11 +5,17 @@ from pathlib import Path
 from loguru import logger
 from tabulate import tabulate
 
-from src.database.connection import init_db, get_db_session
+from src.database.connection import init_db as init_database, get_db_session
 from src.database.models import Candidate, Job, Application
 from src.parsers.resume_parser import ResumeParser
 from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
+
+
+def _coalesce_score(value):
+    if isinstance(value, (int, float)):
+        return float(value)
+    return 0.0
 
 
 @click.group()
@@ -22,7 +28,6 @@ def cli():
 def init_db():
     """Initialize the database and create tables."""
     try:
-        from src.database.connection import init_db as init_database
         init_database()
         click.echo(click.style("✓ Database initialized successfully!", fg="green"))
     except Exception as e:
@@ -42,7 +47,7 @@ def upload_resume(file_path: str, job_id: int):
     """
     try:
         # Initialize database
-        init_db()
+        init_database()
         db = get_db_session()
         
         # Check if job exists
@@ -84,17 +89,23 @@ def upload_resume(file_path: str, job_id: int):
         # Perform matching
         click.echo("\nMatching candidate to job...")
         match_data = match_candidate_to_job(resume_data, job.job_data)
+
+        overall_score = _coalesce_score(match_data.get('overall_score'))
+        must_have_score = _coalesce_score(match_data.get('must_have_skills', {}).get('score'))
+        nice_to_have_score = _coalesce_score(match_data.get('nice_to_have_skills', {}).get('score'))
+        experience_score = _coalesce_score(match_data.get('minimum_years_experience', {}).get('score'))
+        education_score = _coalesce_score(match_data.get('required_education', {}).get('score'))
         
         # Create application
         application = Application(
             candidate_id=candidate.id,
             job_id=job_id,
             match_data=match_data,
-            overall_score=match_data.get('overall_score', 0),
-            must_have_skills_score=match_data.get('must_have_skills', {}).get('score', 0),
-            nice_to_have_skills_score=match_data.get('nice_to_have_skills', {}).get('score', 0),
-            experience_score=match_data.get('minimum_years_experience', {}).get('score', 0),
-            education_score=match_data.get('required_education', {}).get('score', 0)
+            overall_score=overall_score,
+            must_have_skills_score=must_have_score,
+            nice_to_have_skills_score=nice_to_have_score,
+            experience_score=experience_score,
+            education_score=education_score
         )
         
         db.add(application)
@@ -103,13 +114,23 @@ def upload_resume(file_path: str, job_id: int):
         
         click.echo(click.style(f"\n✓ Application created (ID: {application.id})", fg="green"))
         click.echo(f"\nMatch Scores:")
-        click.echo(f"  Overall Score: {application.overall_score:.1f}/100")
-        click.echo(f"  Must-Have Skills: {application.must_have_skills_score:.1f}/100")
-        click.echo(f"  Nice-to-Have Skills: {application.nice_to_have_skills_score:.1f}/100")
-        click.echo(f"  Experience: {application.experience_score:.1f}/100")
-        click.echo(f"  Education: {application.education_score:.1f}/100")
-        click.echo(f"\n  Recommendation: {match_data.get('recommendation', 'N/A')}")
-        click.echo(f"\n  Summary: {match_data.get('summary', 'N/A')}")
+        click.echo(f"  Overall Score: {overall_score:.1f}/100")
+        click.echo(f"  Must-Have Skills: {must_have_score:.1f}/100")
+        click.echo(f"  Nice-to-Have Skills: {nice_to_have_score:.1f}/100")
+        click.echo(f"  Experience: {experience_score:.1f}/100")
+        click.echo(f"  Education: {education_score:.1f}/100")
+        click.echo(f"\nRecommendation: {match_data.get('recommendation', 'N/A')}")
+        click.echo(f"\nSummary: {match_data.get('summary', 'N/A')}")
+        click.echo(f"\nmust_have_skills: {match_data.get('must_have_skills', {}).get('analysis', 'N/A')}")
+        click.echo(f"\nnice_to_have_skills: {match_data.get('nice_to_have_skills', {}).get('analysis', 'N/A')}")
+        click.echo(
+            f"\nminimum_years_experience: "
+            f"{match_data.get('minimum_years_experience', {}).get('analysis', 'N/A')}"
+        )
+        click.echo(
+            f"\nrequired_education: "
+            f"{match_data.get('required_education', {}).get('analysis', 'N/A')}"
+        )
         
         db.close()
         
@@ -129,7 +150,7 @@ def upload_job(file_path: str):
     """
     try:
         # Initialize database
-        init_db()
+        init_database()
         db = get_db_session()
         
         click.echo(f"Parsing job description: {file_path}")
@@ -177,7 +198,7 @@ def upload_job(file_path: str):
 def list_jobs(since: str):
     """List all jobs with optional date filter."""
     try:
-        init_db()
+        init_database()
         db = get_db_session()
         
         # Build query
@@ -225,7 +246,7 @@ def list_jobs(since: str):
 def list_candidates(since: str):
     """List all candidates with optional date filter."""
     try:
-        init_db()
+        init_database()
         db = get_db_session()
         
         # Build query
@@ -274,7 +295,7 @@ def list_candidates(since: str):
 def list_applications(since: str, min_score: float):
     """List applications with optional filters."""
     try:
-        init_db()
+        init_database()
         db = get_db_session()
         
         # Build query
@@ -300,12 +321,13 @@ def list_applications(since: str, min_score: float):
         # Format as table
         table_data = []
         for app in applications:
+            overall_score = _coalesce_score(app.overall_score)
             table_data.append([
                 app.id,
                 app.candidate.name,
                 app.job.title,
                 app.job.company,
-                f"{app.overall_score:.1f}",
+                f"{overall_score:.1f}",
                 app.match_data.get('recommendation', 'N/A') if app.match_data else 'N/A',
                 app.created_at.strftime('%Y-%m-%d %H:%M')
             ])

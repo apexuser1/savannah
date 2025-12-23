@@ -121,6 +121,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments - don't share local 
+.env
 .env.local
 .env.default
 

@@ -1,11 +1,114 @@
 """Job description parser - extracts job data into structured format."""
-import json
 from pathlib import Path
 from typing import Dict, Any
 import PyPDF2
 import pdfplumber
 from docx import Document
 from loguru import logger
+
+JOB_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "basics": {
+            "type": "object",
+            "properties": {
+                "title": {"type": ["string", "null"]},
+                "company": {"type": ["string", "null"]},
+                "location": {
+                    "type": "object",
+                    "properties": {
+                        "address": {"type": ["string", "null"]},
+                        "city": {"type": ["string", "null"]},
+                        "countryCode": {"type": ["string", "null"]},
+                        "region": {"type": ["string", "null"]}
+                    },
+                    "required": ["address", "city", "countryCode", "region"]
+                },
+                "url": {"type": ["string", "null"]},
+                "summary": {"type": ["string", "null"]}
+            },
+            "required": ["title", "company", "location", "url", "summary"]
+        },
+        "description": {"type": ["string", "null"]},
+        "responsibilities": {"type": "array", "items": {"type": "string"}},
+        "requirements": {
+            "type": "object",
+            "properties": {
+                "must_have_skills": {"type": "array", "items": {"type": "string"}},
+                "nice_to_have_skills": {"type": "array", "items": {"type": "string"}},
+                "minimum_years_experience": {"type": ["number", "null"]},
+                "required_education": {
+                    "type": "object",
+                    "properties": {
+                        "level": {"type": ["string", "null"]},
+                        "field": {"type": ["string", "null"]},
+                        "required": {"type": ["boolean", "null"]}
+                    },
+                    "required": ["level", "field", "required"]
+                },
+                "certifications": {"type": "array", "items": {"type": "string"}},
+                "languages": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "language": {"type": ["string", "null"]},
+                            "fluency": {"type": ["string", "null"]}
+                        },
+                        "required": ["language", "fluency"]
+                    }
+                }
+            },
+            "required": [
+                "must_have_skills",
+                "nice_to_have_skills",
+                "minimum_years_experience",
+                "required_education",
+                "certifications",
+                "languages"
+            ]
+        },
+        "compensation": {
+            "type": "object",
+            "properties": {
+                "salary_range": {
+                    "type": "object",
+                    "properties": {
+                        "min": {"type": ["number", "null"]},
+                        "max": {"type": ["number", "null"]},
+                        "currency": {"type": ["string", "null"]}
+                    },
+                    "required": ["min", "max", "currency"]
+                },
+                "salary_text": {"type": ["string", "null"]},
+                "equity": {"type": ["boolean", "null"]},
+                "benefits": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["salary_range", "salary_text", "equity", "benefits"]
+        },
+        "employment_type": {"type": ["string", "null"]},
+        "remote_policy": {"type": ["string", "null"]},
+        "department": {"type": ["string", "null"]},
+        "reports_to": {"type": ["string", "null"]},
+        "team_size": {"type": ["number", "null"]},
+        "application_deadline": {"type": ["string", "null"]},
+        "posted_date": {"type": ["string", "null"]}
+    },
+    "required": [
+        "basics",
+        "description",
+        "responsibilities",
+        "requirements",
+        "compensation",
+        "employment_type",
+        "remote_policy",
+        "department",
+        "reports_to",
+        "team_size",
+        "application_deadline",
+        "posted_date"
+    ]
+}
 
 
 class JobParser:
@@ -101,94 +204,39 @@ class JobParser:
         
         llm_client = LLMClient()
         
-        prompt = f"""You are a job description parsing assistant. Extract information from the following job description and structure it in a format that corresponds to the JSON Resume schema for easy matching.
+        prompt = f"""You are a recruitment analyst extracting a structured job profile for matching.
 
 Job Description:
 {text}
 
-Please extract and structure the information into the following JSON format. If a field is not found, use null or an empty array as appropriate:
+Extraction rules:
+- Use only information explicitly stated in the text; do not infer or assume.
+- If a field is missing, use null or an empty array.
+- Set "description" to the full job description text (lightly cleaned if needed).
+- Responsibilities should be short verb phrases.
+- Skills: put hard requirements in must_have_skills and preferences in nice_to_have_skills.
+- minimum_years_experience must be a number; use the stated value or 0 if not specified.
+- Only set location, compensation, employment_type, remote_policy, dates, and education if explicitly stated.
+- Do not set countryCode unless the country is explicitly mentioned.
 
-{{
-  "basics": {{
-    "title": "Job title",
-    "company": "Company name",
-    "location": {{
-      "address": "Street address if provided",
-      "city": "City",
-      "countryCode": "US",
-      "region": "State/Province"
-    }},
-    "url": "Job posting URL or company website",
-    "summary": "Brief job summary or company description"
-  }},
-  "description": "Full job description",
-  "responsibilities": [
-    "Responsibility 1",
-    "Responsibility 2",
-    "Responsibility 3"
-  ],
-  "requirements": {{
-    "must_have_skills": [
-      "Required skill 1",
-      "Required skill 2",
-      "Required skill 3"
-    ],
-    "nice_to_have_skills": [
-      "Preferred skill 1",
-      "Preferred skill 2"
-    ],
-    "minimum_years_experience": 5,
-    "required_education": {{
-      "level": "Bachelor's/Master's/PhD/High School/etc.",
-      "field": "Computer Science/Engineering/Business/etc.",
-      "required": true
-    }},
-    "certifications": [
-      "Certification 1",
-      "Certification 2"
-    ],
-    "languages": [
-      {{
-        "language": "Language name",
-        "fluency": "Required fluency level"
-      }}
-    ]
-  }},
-  "compensation": {{
-    "salary_range": {{
-      "min": 100000,
-      "max": 150000,
-      "currency": "USD"
-    }},
-    "salary_text": "Salary range as text if specific numbers not available",
-    "equity": true,
-    "benefits": [
-      "Health insurance",
-      "401k",
-      "Remote work"
-    ]
-  }},
-  "employment_type": "Full-time/Part-time/Contract/Internship",
-  "remote_policy": "Remote/Hybrid/On-site",
-  "department": "Department name",
-  "reports_to": "Reporting position",
-  "team_size": 10,
-  "application_deadline": "YYYY-MM-DD",
-  "posted_date": "YYYY-MM-DD"
-}}
+Return data using the structured output schema."""
 
-Return ONLY the JSON object, no additional text or explanation. Extract as much information as possible from the job description. If specific information is not available, use reasonable defaults or null."""
-
-        response = llm_client.call_llm(prompt, temperature=0.3)
-        
         try:
-            # Parse JSON from response
-            job_data = json.loads(response)
+            job_data = llm_client.call_llm(
+                prompt,
+                temperature=0.3,
+                context="job parsing",
+                schema=JOB_SCHEMA,
+                function_name="parse_job_description"
+            )
+
+            if not isinstance(job_data, dict):
+                raise ValueError("LLM response was not a JSON object.")
+
             logger.info("Successfully parsed job description into structured format")
             return job_data
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"LLM response: {response[:500]}")
+        except Exception as e:
+            logger.error(f"Failed to parse LLM response as structured data: {e}")
             
             # Return a minimal valid structure
             return {

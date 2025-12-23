@@ -1,0 +1,147 @@
+SARAH MARTINEZ
+Senior Software Engineer
+
+Email: sarah.martinez@email.com
+Phone: (555) 987-6543
+LinkedIn: linkedin.com/in/sarahmartinez-dev
+GitHub: github.com/smartinez
+Location: Seattle, WA
+
+═══════════════════════════════════════════════════════════════
+
+PROFESSIONAL SUMMARY
+
+Accomplished Senior Software Engineer with 6+ years of experience architecting and delivering scalable, cloud-native applications. Proven expertise in full-stack development with Python and React, containerization with Docker and Kubernetes, and building microservices architectures on AWS. Strong track record of leading technical initiatives, mentoring engineers, and driving best practices in code quality and system design.
+
+═══════════════════════════════════════════════════════════════
+
+TECHNICAL SKILLS
+
+Programming Languages: Python, TypeScript, JavaScript, SQL, Bash
+Frontend: React, Redux, TypeScript, Next.js, Material-UI, CSS3, HTML5
+Backend: Python (Django, Flask, FastAPI), Node.js, Express
+Databases: PostgreSQL, MySQL, MongoDB, Redis (caching), DynamoDB
+APIs: REST API design, GraphQL (basic), API Gateway patterns
+Cloud & DevOps: AWS (EC2, S3, RDS, Lambda, ECS, CloudFormation), Docker, Kubernetes
+Architecture: Microservices, Event-driven architecture, Domain-driven design
+Testing: pytest, Jest, unittest, integration testing, TDD practices
+Version Control: Git, GitHub, GitLab
+Methodologies: Agile/Scrum, Code reviews, Technical documentation
+
+═══════════════════════════════════════════════════════════════
+
+PROFESSIONAL EXPERIENCE
+
+Senior Software Engineer | CloudScale Technologies | Seattle, WA
+January 2022 - Present (2 years, 11 months)
+
+• Lead technical design and implementation of microservices-based platform serving 500K+ users
+• Architect and develop scalable backend services using Python (FastAPI) and PostgreSQL
+• Build sophisticated React/TypeScript frontend applications with complex state management
+• Design and implement RESTful APIs with comprehensive documentation using OpenAPI
+• Containerize applications using Docker and orchestrate deployments on Kubernetes clusters
+• Manage AWS infrastructure including ECS, RDS, S3, Lambda, and CloudFront
+• Implement microservices architecture patterns (service discovery, API gateway, event bus)
+• Optimize PostgreSQL queries and database performance, reducing query times by 60%
+• Utilize Redis for caching strategies, improving API response times by 45%
+• Mentor 4 junior engineers through code reviews, pair programming, and technical guidance
+• Lead architecture review meetings and make key technical decisions for the platform
+• Collaborate with product and design teams to translate business requirements into technical solutions
+• Drive adoption of TypeScript across frontend codebase, improving code maintainability
+• Implement monitoring and alerting using CloudWatch and custom dashboards
+
+Key Achievements:
+- Architected migration from monolithic application to microservices, improving deployment frequency by 5x
+- Reduced infrastructure costs by 30% through optimization of AWS resource usage
+- Led development of real-time analytics platform processing 1M+ events daily
+- Established coding standards and best practices adopted across engineering organization
+
+Software Engineer | InnovateTech | Seattle, WA
+July 2019 - December 2021 (2.5 years)
+
+• Developed full-stack applications using Python (Django), React, and PostgreSQL
+• Built and maintained RESTful APIs serving mobile and web applications
+• Containerized legacy applications using Docker for improved portability
+• Deployed and managed applications on AWS using EC2, RDS, and S3
+• Implemented Kubernetes deployments for development and staging environments
+• Collaborated with DevOps team on infrastructure automation and deployment strategies
+• Wrote comprehensive unit and integration tests achieving 85%+ code coverage
+• Participated in on-call rotation providing production support
+• Contributed to frontend component library built with React and TypeScript
+• Optimized application performance through code profiling and database query optimization
+• Integrated third-party services including payment gateways and authentication providers
+
+Key Projects:
+- E-commerce Platform: Built scalable backend handling 50K+ daily transactions
+- Admin Dashboard: Developed React-based dashboard with real-time data visualization
+- Microservices POC: Created proof-of-concept for microservices migration using Docker
+
+Junior Software Engineer | Digital Solutions Inc. | Portland, OR
+June 2018 - June 2019 (1 year)
+
+• Developed web applications using Python (Flask) and React
+• Worked with PostgreSQL databases including schema design and query writing
+• Built REST APIs for internal and external consumption
+• Fixed bugs and implemented feature requests in existing codebases
+• Participated in Agile ceremonies and sprint planning
+• Gained experience with AWS cloud services and deployment workflows
+
+═══════════════════════════════════════════════════════════════
+
+EDUCATION
+
+Bachelor of Science in Computer Science
+University of Washington | Graduated: May 2018
+GPA: 3.8/4.0
+Dean's List: All Semesters
+
+Relevant Coursework:
+• Advanced Algorithms and Data Structures
+• Database Systems
+• Software Engineering
+• Distributed Systems
+• Web Development
+• Computer Networks
+• Operating Systems
+
+═══════════════════════════════════════════════════════════════
+
+PROFESSIONAL PROJECTS & CONTRIBUTIONS
+
+Open Source Contributions:
+• Contributor to popular Python web framework (100+ commits accepted)
+• Maintainer of React component library with 2K+ GitHub stars
+• Regular participant in code reviews for open-source projects
+
+Side Projects:
+• Cloud-Native Todo App: Full-stack application using React, Python, Docker, Kubernetes, deployed on AWS
+• API Analytics Platform: Microservices-based system for tracking API usage with real-time dashboards
+• TypeScript SDK: Built type-safe SDK for third-party API integration
+
+═══════════════════════════════════════════════════════════════
+
+CERTIFICATIONS & TRAINING
+
+• AWS Certified Solutions Architect - Associate (2021)
+• Certified Kubernetes Application Developer (CKAD) (2022)
+• Advanced React and TypeScript (Frontend Masters, 2021)
+• Microservices Architecture Patterns (O'Reilly, 2020)
+
+═══════════════════════════════════════════════════════════════
+
+SPEAKING & LEADERSHIP
+
+• Speaker at Seattle Tech Conference 2023: "Scaling Microservices with Kubernetes"
+• Led internal workshop series on Docker and Kubernetes best practices
+• Technical blog with 50+ articles on Python, React, and cloud architecture
+• Mentor in Women in Tech mentorship program
+
+═══════════════════════════════════════════════════════════════
+
+ADDITIONAL INFORMATION
+
+• Strong advocate for clean code, testing, and documentation
+• Experience with Agile methodologies and leading sprint planning
+• Excellent communication skills for both technical and non-technical audiences
+• Passionate about continuous learning and staying current with technology trends
+• Active member of Seattle Python User Group and React Seattle meetup

@@ -1,0 +1,52 @@
+SENIOR SOFTWARE ENGINEER
+
+About TechVision Solutions:
+TechVision Solutions is a fast-growing technology company specializing in cloud-native enterprise solutions. With over 500 employees across North America, we help Fortune 500 companies modernize their infrastructure and build scalable applications. Our engineering team works with cutting-edge technologies to solve complex business problems.
+
+Role Overview:
+We are seeking an experienced Senior Software Engineer to join our Platform Engineering team. In this role, you will architect and develop mission-critical microservices, mentor junior engineers, and drive technical decisions that impact millions of users. You'll work in a collaborative, agile environment where innovation and code quality are paramount.
+
+Must-Have Requirements:
+• 5+ years of professional software development experience
+• 2+ years in a senior or lead engineering role
+• Strong proficiency in Python for backend development
+• Extensive experience with React for building modern web applications
+• Deep knowledge of PostgreSQL including query optimization and schema design
+• Proven expertise in designing and implementing REST APIs
+• Hands-on experience with Docker containerization
+• Production experience with Kubernetes orchestration and deployment
+• Strong background in CI/CD pipelines (Jenkins, GitLab CI, GitHub Actions, or similar)
+
+Nice-to-Have Skills:
+• Experience with AWS cloud services (EC2, S3, RDS, Lambda, ECS)
+• Proficiency in TypeScript for type-safe development
+• Knowledge of GraphQL API design and implementation
+• Experience building and maintaining microservices architecture
+• Familiarity with Redis for caching and session management
+
+Education:
+• Bachelor's degree in Computer Science, Software Engineering, or related technical field (or equivalent practical experience)
+
+Key Responsibilities:
+• Design, develop, and maintain scalable backend services and APIs
+• Build responsive, high-performance front-end applications using React
+• Implement and maintain containerized applications using Docker and Kubernetes
+• Establish and improve CI/CD practices across the development lifecycle
+• Write clean, maintainable, well-tested code following best practices
+• Conduct code reviews and provide constructive feedback to team members
+• Collaborate with product managers and designers to translate requirements into technical solutions
+• Mentor junior engineers and contribute to team growth
+• Participate in on-call rotation for production support
+• Optimize application performance and database queries
+• Stay current with emerging technologies and industry trends
+
+What We Offer:
+• Competitive salary ($130,000 - $170,000 based on experience)
+• Comprehensive health, dental, and vision insurance
+• 401(k) with company match
+• Flexible work arrangements (hybrid remote)
+• Professional development budget
+• Stock options
+• Collaborative and inclusive team culture
+
+TechVision Solutions is an equal opportunity employer. We celebrate diversity and are committed to creating an inclusive environment for all employees.
