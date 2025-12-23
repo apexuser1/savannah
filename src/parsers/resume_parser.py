@@ -6,6 +6,8 @@ import pdfplumber
 from docx import Document
 from loguru import logger
 
+from src.config import Config
+
 RESUME_SCHEMA = {
     "type": "object",
     "properties": {
@@ -303,7 +305,7 @@ class ResumeParser:
         """
         from src.matching.matcher import LLMClient
         
-        llm_client = LLMClient()
+        llm_client = LLMClient(model=Config.RESUME_MODEL)
         
         prompt = f"""You are a resume parsing assistant. Extract facts from the resume text and format them according to the JSON Resume schema (jsonresume.org).
 

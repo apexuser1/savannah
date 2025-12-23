@@ -6,6 +6,8 @@ import pdfplumber
 from docx import Document
 from loguru import logger
 
+from src.config import Config
+
 JOB_SCHEMA = {
     "type": "object",
     "properties": {
@@ -202,7 +204,7 @@ class JobParser:
         """
         from src.matching.matcher import LLMClient
         
-        llm_client = LLMClient()
+        llm_client = LLMClient(model=Config.JOB_MODEL)
         
         prompt = f"""You are a recruitment analyst extracting a structured job profile for matching.
 

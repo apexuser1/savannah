@@ -26,6 +26,12 @@ class Config:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4-turbo-preview")
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+    # Per-task model selection
+    DEFAULT_MODEL = OPENROUTER_MODEL if LLM_PROVIDER == "openrouter" else OPENAI_MODEL
+    RESUME_MODEL = os.getenv("RESUME_MODEL", DEFAULT_MODEL)
+    JOB_MODEL = os.getenv("JOB_MODEL", DEFAULT_MODEL)
+    MATCH_MODEL = os.getenv("MATCH_MODEL", DEFAULT_MODEL)
     
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
