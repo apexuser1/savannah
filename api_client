@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+"""Wrapper to allow `python api_client` to run the API client CLI."""
+from api_client import cli
+
+
+if __name__ == "__main__":
+    cli()
