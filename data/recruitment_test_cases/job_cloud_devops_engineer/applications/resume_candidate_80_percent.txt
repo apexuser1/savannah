@@ -1,0 +1,59 @@
+MORGAN LEE
+Senior DevOps Engineer
+
+Email: morgan.lee@email.com
+Phone: (415) 555-0198
+LinkedIn: linkedin.com/in/morganlee-devops
+GitHub: github.com/mlee-devops
+Location: San Francisco, CA
+
+----------------------------------------
+PROFESSIONAL SUMMARY
+Senior DevOps Engineer with 6+ years of experience building AWS cloud infrastructure, Kubernetes
+platforms, and CI/CD automation. Deep expertise in Terraform, Docker, Git-based workflows, and
+monitoring with Prometheus, Grafana, and CloudWatch. Strong scripting in Python and Bash with a
+focus on reliability, security, and self-service automation.
+
+----------------------------------------
+TECHNICAL SKILLS
+Cloud Platforms: AWS (EC2, S3, RDS, EKS, Lambda, CloudWatch), Azure (basic DR)
+Infrastructure as Code: Terraform (advanced), CloudFormation (production use)
+Containers: Docker, Kubernetes (EKS), Helm
+CI/CD: Jenkins, GitHub Actions, GitLab CI
+Monitoring: Prometheus, Grafana, CloudWatch, Datadog
+Scripting: Python, Bash, Go (basic)
+Version Control: Git, GitHub, GitOps (Argo CD)
+Security: IAM, Vault, secrets rotation, image scanning
+Networking: VPC, subnets, load balancers, DNS
+
+----------------------------------------
+PROFESSIONAL EXPERIENCE
+Senior DevOps Engineer | CloudScale Labs | San Francisco, CA
+June 2021 - Present
+- Designed multi-region AWS infrastructure with Terraform and CloudFormation supporting 40+ services.
+- Built EKS clusters with Helm and network policies; improved deployment reliability to 99.95% uptime.
+- Implemented CI/CD pipelines in Jenkins and GitHub Actions with automated testing and security scans.
+- Deployed centralized monitoring with Prometheus, Grafana, and CloudWatch dashboards and alerts.
+- Automated environment provisioning with Python and Bash, cutting setup time from days to hours.
+- Established GitOps workflows using Argo CD for configuration management and drift detection.
+- Led disaster recovery runbooks and quarterly failover tests across regions.
+
+DevOps Engineer | Horizon Fintech | San Jose, CA
+July 2018 - May 2021
+- Containerized legacy services with Docker and migrated workloads to EKS.
+- Built reusable Terraform modules for VPC, IAM, and RDS; standardized tagging and cost reporting.
+- Implemented configuration management with Ansible for Linux fleet hardening.
+- Supported serverless automation using AWS Lambda for log processing and cleanup jobs.
+- Partnered with security to enforce IAM least privilege and secrets management.
+- Participated in on-call rotation and incident response with clear postmortems.
+
+----------------------------------------
+CERTIFICATIONS
+- AWS Certified Solutions Architect - Associate (2022)
+- Certified Kubernetes Administrator (CKA) (2023)
+- HashiCorp Terraform Associate (2021)
+
+----------------------------------------
+EDUCATION
+Bachelor of Science in Computer Science
+University of California, Davis | 2014 - 2018

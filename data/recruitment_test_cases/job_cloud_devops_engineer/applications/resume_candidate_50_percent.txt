@@ -1,0 +1,37 @@
+TAYLOR BROOKS
+Systems Administrator
+
+Email: taylor.brooks@email.com
+Phone: (512) 555-0109
+LinkedIn: linkedin.com/in/taylorbrooks-it
+Location: Austin, TX
+
+----------------------------------------
+PROFESSIONAL SUMMARY
+Systems Administrator with 2 years of experience supporting Linux servers and basic AWS services.
+Comfortable with Bash scripting and routine infrastructure maintenance. Limited exposure to
+containerization and cloud automation.
+
+----------------------------------------
+TECHNICAL SKILLS
+Operating Systems: Linux (Ubuntu, CentOS)
+Cloud Platforms: AWS (EC2, S3 - basic usage)
+Containers: Docker (local development only)
+Scripting: Bash, Python (basic)
+Web/Networking: Nginx, DNS, SSL certificates
+Version Control: Git
+
+----------------------------------------
+PROFESSIONAL EXPERIENCE
+Systems Administrator | GreenField Logistics | Austin, TX
+March 2022 - Present
+- Maintained on-prem Linux servers and virtualization hosts.
+- Assisted with a small AWS migration for file storage using S3.
+- Wrote Bash scripts for nightly backups and log cleanup.
+- Performed manual application deployments and server patching.
+- Monitored system health using CloudWatch logs and basic OS tools.
+
+----------------------------------------
+EDUCATION
+Associate of Applied Science in Network Administration
+Austin Community College | 2020 - 2022

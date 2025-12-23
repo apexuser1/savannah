@@ -1,0 +1,40 @@
+LUCAS BENNETT
+Data Analyst / Python Developer
+
+Email: lucas.bennett@email.com
+Phone: (646) 555-0161
+LinkedIn: linkedin.com/in/lucasbennett-data
+Location: New York, NY
+
+----------------------------------------
+PROFESSIONAL SUMMARY
+Data analyst with 2 years of experience in financial reporting and Python-based analytics.
+Strong SQL skills and exposure to market data feeds, but limited experience with trading
+systems, low-latency engineering, and C++ production development.
+
+----------------------------------------
+TECHNICAL SKILLS
+Programming: Python, SQL, Bash (basic)
+Analytics: Pandas, Excel, Power BI
+Databases: PostgreSQL
+Platforms: Linux (basic), Git
+Finance: equity market data and pricing reports
+
+----------------------------------------
+PROFESSIONAL EXPERIENCE
+Data Analyst | Oak Street Asset Management | New York, NY
+January 2023 - Present
+- Built Python scripts to generate daily market exposure and PnL reports.
+- Maintained PostgreSQL tables used for portfolio analytics.
+- Worked with vendor market data delivered via REST endpoints.
+
+Junior Developer | FinInsight | New York, NY
+June 2021 - December 2022
+- Assisted with data quality checks on historical price feeds.
+- Wrote SQL queries for ad-hoc analysis and reporting.
+- Completed a small C++ coursework project for options pricing (academic only).
+
+----------------------------------------
+EDUCATION
+Bachelor of Arts in Economics
+New York University | 2017 - 2021

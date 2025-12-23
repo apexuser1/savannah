@@ -1,0 +1,44 @@
+JAMIE PATEL
+DevOps Engineer
+
+Email: jamie.patel@email.com
+Phone: (303) 555-0142
+LinkedIn: linkedin.com/in/jamiepatel-devops
+GitHub: github.com/jpatel-ops
+Location: Denver, CO
+
+----------------------------------------
+PROFESSIONAL SUMMARY
+DevOps Engineer with 3+ years of experience supporting AWS environments, Docker-based deployments,
+and CI/CD pipelines. Hands-on with Terraform for basic infrastructure provisioning and exposure to
+Kubernetes in staging environments. Comfortable automating routine tasks with Python and Bash.
+
+----------------------------------------
+TECHNICAL SKILLS
+Cloud Platforms: AWS (EC2, S3, RDS, ECS, CloudWatch)
+Infrastructure as Code: Terraform (intermediate)
+Containers: Docker, Kubernetes (limited EKS exposure)
+CI/CD: GitHub Actions, Jenkins (basic)
+Monitoring: CloudWatch, Prometheus (basic dashboards)
+Scripting: Python, Bash
+Version Control: Git, GitHub
+
+----------------------------------------
+PROFESSIONAL EXPERIENCE
+DevOps Engineer | Lakeview Digital | Denver, CO
+August 2021 - Present
+- Maintained AWS EC2, S3, and RDS environments for customer-facing services.
+- Built CI/CD pipelines in GitHub Actions to automate tests and deployments.
+- Used Terraform to provision VPCs, security groups, and EC2 instances.
+- Assisted with EKS cluster operations in staging; managed Docker images and Helm charts.
+- Configured CloudWatch alarms and basic Prometheus dashboards for uptime tracking.
+- Wrote Python and Bash scripts to automate backups and log rotation.
+
+----------------------------------------
+CERTIFICATIONS
+- AWS Certified Cloud Practitioner (2022)
+
+----------------------------------------
+EDUCATION
+Bachelor of Science in Information Technology
+Colorado State University | 2017 - 2021

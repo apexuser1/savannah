@@ -1,0 +1,57 @@
+DANIEL PARK
+Senior Quantitative Developer
+
+Email: daniel.park@email.com
+Phone: (212) 555-0175
+LinkedIn: linkedin.com/in/danielpark-quant
+GitHub: github.com/dpark-quant
+Location: New York, NY
+
+----------------------------------------
+PROFESSIONAL SUMMARY
+Senior Quantitative Developer with 6+ years of experience building low-latency trading systems,
+real-time market data platforms, and risk analytics in Python and C++. Strong background in
+performance optimization, multithreading, and time-series data. Proven track record delivering
+high-throughput OMS components and FIX connectivity in production environments.
+
+----------------------------------------
+TECHNICAL SKILLS
+Programming: Python, C++17, SQL, Bash
+Trading Systems: OMS/EMS, market data processing, order routing, pre-trade risk
+Databases: PostgreSQL, TimescaleDB, kdb+ (working knowledge), Redis
+Real-Time Systems: Kafka, ZeroMQ, asyncio, multithreading
+Low-Latency: performance profiling (perf, gprof), network tuning
+APIs & Protocols: FIX, REST, WebSocket, Bloomberg API
+Tools: Linux, Git, Docker
+Quant/Math: options pricing, Greeks, statistical arbitrage
+
+----------------------------------------
+PROFESSIONAL EXPERIENCE
+Senior Quantitative Developer | Arcadia Capital | New York, NY
+March 2020 - Present
+- Designed a C++ order router with sub-millisecond latency for equities and futures execution.
+- Built a Python market data pipeline handling 80M+ ticks daily with Kafka and fault tolerance.
+- Implemented OMS services with pre-trade risk checks and real-time position monitoring.
+- Optimized TimescaleDB queries and partitioning, reducing analytics latency by 55%.
+- Integrated FIX sessions with multiple brokers for routing and execution reports.
+- Led backtesting framework improvements and partnered with researchers on alpha deployment.
+
+Quantitative Developer | Helix Trading | Chicago, IL
+July 2017 - February 2020
+- Developed C++ pricing libraries for options and futures with unit test coverage.
+- Built real-time risk dashboards in Python for Greeks exposure and PnL monitoring.
+- Maintained low-latency market data handlers and optimized hot paths via profiling.
+- Deployed messaging pipelines with ZeroMQ and Kafka for strategy signals.
+
+----------------------------------------
+PROJECTS
+- Machine Learning Signal Research: built a Python pipeline for feature engineering and model tests.
+- Smart Order Router: tuned routing logic to reduce slippage and fees across venues.
+
+----------------------------------------
+EDUCATION
+Master of Science in Financial Engineering
+Columbia University | 2015 - 2017
+
+Bachelor of Science in Computer Science
+University of Michigan | 2011 - 2015

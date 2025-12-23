@@ -1,0 +1,44 @@
+PRIYA NAIR
+Quantitative Software Engineer
+
+Email: priya.nair@email.com
+Phone: (312) 555-0134
+LinkedIn: linkedin.com/in/priyanair-quant
+GitHub: github.com/pnair-dev
+Location: Chicago, IL
+
+----------------------------------------
+PROFESSIONAL SUMMARY
+Quantitative Software Engineer with 4 years of experience building market data pipelines and
+analytics tooling in Python, with working knowledge of C++ and SQL. Experience with real-time
+streaming and time-series data stores, but limited exposure to OMS/EMS and ultra-low-latency systems.
+
+----------------------------------------
+TECHNICAL SKILLS
+Programming: Python, C++ (intermediate), SQL
+Data Systems: PostgreSQL, TimescaleDB, Redis
+Streaming: Kafka, WebSocket feeds
+Quant Tools: Pandas, NumPy, backtesting scripts
+Platforms: Linux, Docker, Git
+APIs: REST, vendor market data APIs
+
+----------------------------------------
+PROFESSIONAL EXPERIENCE
+Quantitative Software Engineer | Vertex Analytics | Chicago, IL
+August 2021 - Present
+- Built Python services to normalize and store real-time market data for equities and futures.
+- Implemented TimescaleDB schemas and retention policies for tick data.
+- Developed analytics jobs for risk reporting and end-of-day PnL summaries.
+- Maintained a C++ pricing module for options with periodic performance tuning.
+- Created Kafka-based pipelines for distributing pricing signals to downstream services.
+
+Software Engineer (Data) | Riverbank Finance | Chicago, IL
+June 2020 - July 2021
+- Developed Python ETL jobs for historical market data ingestion.
+- Wrote SQL queries and indexes to speed up analytics dashboards.
+- Supported Linux deployments and monitoring scripts for data services.
+
+----------------------------------------
+EDUCATION
+Bachelor of Science in Computer Science
+University of Illinois at Urbana-Champaign | 2016 - 2020
