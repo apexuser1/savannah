@@ -2,7 +2,7 @@
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, cast
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -16,6 +16,9 @@ from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
 from src.what_if.runner import run_what_if
 from src.what_if.scenario import ScenarioValidationError
+from src.optimisation.runner import run_optimisation
+from src.optimisation.models import OptimisationValidationError
+from src.optimisation.api_models import OptimisationRequest
 
 
 # Initialize database on startup
@@ -105,7 +108,8 @@ def root():
             "GET /api/jobs": "List jobs",
             "GET /api/candidates": "List candidates",
             "GET /api/applications": "List applications",
-            "POST /api/what-if": "Run a what-if scenario"
+            "POST /api/what-if": "Run a what-if scenario",
+            "POST /api/optimisation": "Run an optimisation search"
         }
     }
 
@@ -128,6 +132,8 @@ async def upload_resume(
             raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
         
         # Validate file type
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Uploaded file must have a filename")
         file_extension = Path(file.filename).suffix.lower()
         if file_extension not in ['.pdf', '.docx', '.txt', '.md']:
             raise HTTPException(
@@ -172,7 +178,8 @@ async def upload_resume(
             
             # Perform matching
             logger.info("Matching candidate to job...")
-            match_data = match_candidate_to_job(resume_data, job.job_data)
+            job_data = cast(Dict[str, Any], job.job_data)
+            match_data = match_candidate_to_job(resume_data, job_data)
             
             # Create application
             application = Application(
@@ -221,6 +228,8 @@ async def upload_job(
     """Upload and parse a job description."""
     try:
         # Validate file type
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Uploaded file must have a filename")
         file_extension = Path(file.filename).suffix.lower()
         if file_extension not in ['.pdf', '.docx', '.txt', '.md']:
             raise HTTPException(
@@ -355,6 +364,7 @@ def list_applications(
             query = query.filter(Application.overall_score >= min_score)
         
         applications = query.order_by(
+            Application.job_id,
             Application.overall_score.desc(),
             Application.created_at.desc()
         ).all()
@@ -400,10 +410,36 @@ def run_what_if_scenario(
             scenario_text=payload.scenario_text,
             scenario_payload=payload.scenario,
             overrides=overrides,
-            include_details=payload.include_details,
-            include_summary=payload.summary
+            include_details=bool(payload.include_details),
+            include_summary=bool(payload.summary)
         )
     except ScenarioValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"errors": exc.errors}
+        )
+
+    return JSONResponse(content=result)
+
+
+@app.post("/api/optimisation")
+def run_optimisation_search(
+    payload: OptimisationRequest,
+    db: Session = Depends(get_db)
+):
+    """Run an optimisation search against a job."""
+    try:
+        result = run_optimisation(
+            db,
+            job_id=payload.job_id,
+            optimisation_payload=payload.optimisation,
+            candidate_count_override=payload.candidate_count,
+            top_k_override=payload.top_k,
+            include_details=False,
+            include_summary_table=False,
+            include_best_only=True
+        )
+    except OptimisationValidationError as exc:
         raise HTTPException(
             status_code=422,
             detail={"errors": exc.errors}

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """API client entry point for the Resume Job Matcher."""
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -184,6 +185,133 @@ def upload_resume(file_path: str, job_id: int):
         raise click.Abort()
 
 
+@cli.command("what-if")
+@click.argument("scenario_text", required=True)
+@click.argument("job_id", type=int)
+@click.option("--scenario-file", type=click.Path(exists=True), help="Path to a scenario JSON file.")
+@click.option("--match-mode", type=click.Choice(["full", "partial"]))
+@click.option("--partial-weight", type=float)
+@click.option("--threshold", type=float)
+@click.option("--explain", is_flag=True, help="Include per-candidate details in the output.")
+@click.option("--summary", is_flag=True, help="Output a summary table instead of JSON details.")
+def what_if(scenario_text, job_id, scenario_file, match_mode, partial_weight, threshold, explain, summary):
+    """Run a what-if scenario against a job."""
+    if summary and explain:
+        click.echo(click.style("--summary cannot be used with --explain.", fg="red"))
+        raise click.Abort()
+
+    payload = {
+        "job_id": job_id,
+        "include_details": explain,
+        "summary": summary
+    }
+
+    if scenario_file:
+        with open(scenario_file, "r", encoding="utf-8") as handle:
+            payload["scenario"] = json.load(handle)
+    else:
+        payload["scenario_text"] = scenario_text
+
+    if match_mode:
+        payload["match_mode"] = match_mode
+    if partial_weight is not None:
+        payload["partial_match_weight"] = partial_weight
+    if threshold is not None:
+        payload["overall_score_threshold"] = threshold
+
+    try:
+        with httpx.Client(base_url=API_BASE_URL, timeout=60.0) as client:
+            response = client.post("/api/what-if", json=payload)
+        result = _request_json(response)
+
+        if summary:
+            summary_table = result.get("summary_table", [])
+            if not summary_table:
+                click.echo("No applications found.")
+                return
+            table_data = []
+            for row in summary_table:
+                original_score = _coalesce_score(row.get("original_score"))
+                scenario_score = _coalesce_score(row.get("scenario_score"))
+                table_data.append(
+                    [
+                        row.get("id"),
+                        row.get("candidate"),
+                        row.get("job_title"),
+                        row.get("company"),
+                        row.get("recommendation", "N/A"),
+                        row.get("created", ""),
+                        f"{original_score:.1f}",
+                        f"{scenario_score:.1f}"
+                    ]
+                )
+
+            headers = [
+                "ID",
+                "Candidate",
+                "Job Title",
+                "Company",
+                "Recommendation",
+                "Created",
+                "Original Score",
+                "Scenario Score"
+            ]
+            click.echo(tabulate(table_data, headers=headers, tablefmt='grid'))
+            return
+
+        click.echo("Normalized scenario:")
+        click.echo(json.dumps(result.get("normalized_scenario"), indent=2))
+        click.echo("\nShock report:")
+        click.echo(json.dumps(result.get("shock_report"), indent=2))
+
+        warnings = result.get("warnings") or []
+        if warnings:
+            click.echo("\nWarnings:")
+            for warning in warnings:
+                click.echo(f"- {warning}")
+
+        click.echo("\nSummary:")
+        click.echo(json.dumps(result.get("summary", {}), indent=2))
+
+        if explain:
+            click.echo("\nCandidates:")
+            click.echo(json.dumps(result.get("candidates", []), indent=2))
+
+    except Exception as e:
+        click.echo(click.style(f"Error: {e}", fg="red"))
+        raise click.Abort()
+
+
+@cli.command("optimisation")
+@click.argument("job_id", type=int)
+@click.option("--optimisation-file", required=True, type=click.Path(exists=True))
+@click.option("--candidates", type=int, help="Override the target candidate count.")
+@click.option("--top-k", type=int, help="Override how many results are returned.")
+def optimisation(job_id, optimisation_file, candidates, top_k):
+    """Run an optimisation search against a job."""
+    payload = {"job_id": job_id}
+    try:
+        with open(optimisation_file, "r", encoding="utf-8") as handle:
+            payload["optimisation"] = json.load(handle)
+    except Exception as e:
+        click.echo(click.style(f"Error: {e}", fg="red"))
+        raise click.Abort()
+
+    if candidates is not None:
+        payload["candidate_count"] = candidates
+    if top_k is not None:
+        payload["top_k"] = top_k
+
+    try:
+        with httpx.Client(base_url=API_BASE_URL, timeout=60.0) as client:
+            response = client.post("/api/optimisation", json=payload)
+        result = _request_json(response)
+        click.echo(json.dumps(result, indent=2))
+    except Exception as e:
+        click.echo(click.style(f"Error: {e}", fg="red"))
+        raise click.Abort()
+
+
 @cli.command()
 @click.option('--since', type=str, help='Filter jobs created since date (YYYY-MM-DD)')
 def list_jobs(since: str):
@@ -308,16 +436,26 @@ def list_applications(since: str, min_score: float):
             if isinstance(match_data, dict):
                 recommendation = match_data.get("recommendation", "N/A")
             table_data.append([
+                app.get("job_id"),
+                f"{overall_score:.1f}",
                 app.get("id"),
                 app.get("candidate", {}).get("name") or app.get("candidate_id"),
                 app.get("job", {}).get("title") or app.get("job_id"),
                 app.get("job", {}).get("company") or "N/A",
-                f"{overall_score:.1f}",
                 recommendation,
                 created_display
             ])
 
-        headers = ['ID', 'Candidate', 'Job Title', 'Company', 'Score', 'Recommendation', 'Created']
+        headers = [
+            'Job ID',
+            'Score',
+            'Application ID',
+            'Candidate',
+            'Job Title',
+            'Company',
+            'Recommendation',
+            'Created'
+        ]
         click.echo(f"\nFound {len(applications)} application(s):\n")
         click.echo(tabulate(table_data, headers=headers, tablefmt='grid'))
 

@@ -1,0 +1,27 @@
+{
+  "target": { "candidate_count": 10, "mode": "at_least" },
+  "strategy": {"name": "greedy"},
+  "constraints": {
+    "max_total_changes": 3,
+    "allowed_relaxations": [
+      "remove_nice_to_have",
+      "demote_must_to_nice",
+      "remove_must_have",
+      "lower_min_years",
+      "disable_education",
+      "lower_threshold"
+    ],
+    "min_years_override": { "min": 0, "step": 1 },
+    "overall_score_threshold": { "min": 40, "step": 5 },
+    "max_skill_changes": 2
+  },
+  "costs": {
+    "remove_nice_to_have": 1,
+    "demote_must_to_nice": 2,
+    "remove_must_have": 3,
+    "lower_min_years": 1,
+    "disable_education": 2,
+    "lower_threshold": 1
+  },
+  "top_k": 5
+}

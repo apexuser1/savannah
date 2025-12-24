@@ -674,3 +674,286 @@ Scenario JSON parameters:
 - `weights_override` must sum to 100.
 - `match_mode` must be `full` or `partial` (CLI) and `full_only` or `partial_ok` (JSON).
 - Full-only mode requires match_data that includes full/partial breakdowns; older applications must be re-matched.
+
+## Optimisation (Goal Seeking)
+
+The optimiser searches for minimal relaxations to reach a target candidate count. It only relaxes constraints (no adding requirements).
+
+### Quick Start
+
+```bash
+python cli.py optimisation 13 --optimisation-file optimisation.json --candidates 10
+```
+
+The CLI prints a summary table first (same shape as `--summary`). Use `--detail` to append JSON candidate details for the best result.
+
+### Optimisation JSON Example
+
+```json
+{
+  "target": { "candidate_count": 10, "mode": "at_least" },
+  "strategy": {
+    "name": "beam",
+    "options": { "beam_width": 5 }
+  },
+  "constraints": {
+    "max_total_changes": 3,
+    "allowed_relaxations": [
+      "remove_nice_to_have",
+      "demote_must_to_nice",
+      "remove_must_have",
+      "lower_min_years",
+      "disable_education",
+      "lower_threshold"
+    ],
+    "min_years_override": { "min": 0, "step": 1 },
+    "overall_score_threshold": { "min": 40, "step": 5 },
+    "max_skill_changes": 2
+  },
+  "costs": {
+    "remove_nice_to_have": 1,
+    "demote_must_to_nice": 2,
+    "remove_must_have": 3,
+    "lower_min_years": 1,
+    "disable_education": 2,
+    "lower_threshold": 1
+  },
+  "top_k": 5
+}
+```
+
+Notes:
+- `job_id` is provided via the CLI/API, not inside the optimisation file.
+- `candidate_count` can be overridden on the CLI/API to reuse the same file for different targets.
+- Relaxations are applied one skill at a time; nice-to-have skills are considered first.
+
+### Strategies and Options
+
+Available strategies (with options and defaults):
+- `greedy`: no options. Tries the best single relaxation at each step until the target is met or max changes are used.
+- `beam`: options: `beam_width` (default 5). Explores the top N candidates at each step.
+- `monte_carlo`: options: `max_runs` (default 200), `seed` (optional). Randomly samples relaxation sequences.
+
+Algorithm notes:
+- Greedy: fast, deterministic, and locally optimal; it may miss better multi-step paths that require a temporary dip.
+- Beam: balances speed and breadth by keeping the best N partial solutions at each step; higher `beam_width` increases quality and cost.
+- Monte Carlo: explores diverse combinations stochastically; useful when the search space is large or non-linear, and a `seed` makes runs repeatable.
+
+Example: greedy (no options)
+```json
+{
+  "strategy": { "name": "greedy" }
+}
+```
+
+Example: beam search (custom width)
+```json
+{
+  "strategy": { "name": "beam", "options": { "beam_width": 10 } }
+}
+```
+
+Example: monte carlo (runs + seed)
+```json
+{
+  "strategy": { "name": "monte_carlo", "options": { "max_runs": 500, "seed": 42 } }
+}
+```
+
+## Optimisation (Goal Seeking) - Descriptions
+
+### Greedy Strategy
+Identifier: `greedy`
+
+Options: none
+
+Core idea: At each step, apply the single best available relaxation, given the current state.
+
+How it works:
+- Start from the current configuration.
+- Evaluate all immediately available relaxations.
+- Select the relaxation that gives the largest improvement in the objective.
+- Apply it.
+- Repeat until:
+  - The target is met, or
+  - No relaxation yields improvement, or
+  - The maximum number of allowed changes/steps is reached.
+
+Characteristics:
+- Deterministic: Given the same starting point and constraints, it always produces the same sequence of changes.
+- Myopic / locally optimal: Optimizes only for the next step and never looks ahead multiple steps.
+- Very fast: Minimal bookkeeping; only one candidate path is considered at any time.
+
+When to use greedy:
+- The search space is small or relatively smooth (local choices are usually good globally).
+- You care about speed and predictability more than global optimality.
+- You are prototyping, running quick what-if analyses, or want a baseline for comparison.
+- You need stable results for regression testing or CI pipelines.
+
+Advantages:
+- Simple to reason about and debug.
+- Minimal computation and memory overhead.
+- Results are easy to explain ("we always picked the best next move").
+
+Limitations:
+- Can get stuck in local optima if the globally optimal path requires a short-term worse move.
+- Does not explore alternative paths once it finds a locally attractive one.
+- Not ideal for highly non-linear or rugged search spaces.
+
+### Beam Search Strategy
+Identifier: `beam`
+
+Options:
+- `beam_width` (default: 5) - the maximum number of top partial solutions kept at each depth.
+
+Core idea: Like a wider greedy search; it considers the best few paths in parallel instead of committing to a single one.
+
+How it works:
+- Initialize the beam with the starting configuration.
+- For each step:
+  - For every configuration in the current beam, generate all valid next-step relaxations.
+  - Combine all resulting candidates into a single pool.
+  - Score each candidate using your objective.
+  - Keep only the top `beam_width` candidates (the new beam).
+- Continue until:
+  - At least one beam element meets the target, or
+  - The maximum depth / number of changes is reached, or
+  - No new candidates are generated.
+
+Characteristics:
+- Deterministic, as long as scoring is deterministic and ties are handled consistently.
+- Breadth-aware: Considers multiple promising directions simultaneously.
+- More computationally expensive than greedy, but usually far cheaper than exhaustive search.
+- Quality and cost scale with `beam_width`.
+
+When to use beam:
+- You want a better trade-off between solution quality and runtime compared to greedy.
+- The search space is complex enough that a single greedy path often misses good solutions.
+- There are many interacting relaxations where order matters.
+- You need determinism for reproducibility but also want some exploration.
+
+Tuning `beam_width`:
+- `beam_width = 1`: behaves like greedy.
+- `beam_width` around 3-10: good starting range with modest overhead.
+- `beam_width > 20`: consider only if the search space is huge and compute is available.
+
+Advantages:
+- Often finds better solutions than greedy at the same depth.
+- Deterministic and relatively straightforward to reason about.
+- Balances exploration (multiple paths) and exploitation (top scoring).
+
+Limitations:
+- Runtime grows with `beam_width` and branching factor.
+- Still heuristic; no global optimality guarantee unless the beam is extremely wide.
+- Requires tuning `beam_width` for your problem scale.
+
+### Monte Carlo Strategy
+Identifier: `monte_carlo`
+
+Options:
+- `max_runs` (default: 200) - maximum number of random sequences to explore.
+- `seed` (optional) - if set, makes sampling and results repeatable.
+
+Core idea: Explore many random sequences of relaxations and keep track of the best outcome.
+
+How it works:
+- For each run:
+  - Start from the initial configuration.
+  - Repeatedly choose a valid relaxation (optionally weighted), apply it, and update the configuration.
+  - Stop early if the target is met or the maximum depth is reached.
+  - Record the final configuration and its score.
+- After `max_runs`, return the best configuration found across all runs.
+
+Characteristics:
+- Stochastic: runs can differ unless a `seed` is set.
+- Exploratory: samples broadly rather than traversing systematically.
+- Flexible: handles large, irregular, or discontinuous search spaces.
+
+When to use monte_carlo:
+- The search space is very large or highly non-linear.
+- You want broad exploration and can accept stochastic outcomes.
+- You want quick "good enough" answers rather than strict optimality.
+
+Tuning `max_runs`:
+- 50-100: quick exploratory runs.
+- 200 (default): balanced default.
+- 500+: use when runs are cheap and you need higher-quality approximations.
+
+Using `seed`:
+- Set `seed` for reproducibility in debugging, demos, or regression tests.
+- Leave `seed` unset to explore different regions on each run.
+
+Advantages:
+- Simple to scale (runs can be parallelized).
+- Handles complex constraints and interactions.
+- Can discover high-quality solutions missed by structured search.
+
+Limitations:
+- No guarantee of global optimality in a finite number of runs.
+- Quality depends on `max_runs` and the sampling policy.
+- Less predictable convergence quality than deterministic strategies.
+
+### Choosing the Right Strategy
+
+Decision guide:
+- Need speed and determinism, search is simple or small? Use `greedy`.
+- Want better quality than greedy but still deterministic? Use `beam` with moderate `beam_width` (5-10).
+- Search is very large/irregular and exploration matters? Use `monte_carlo` with a reasonable `max_runs` (around 200).
+
+Combined approach:
+- Start with `greedy` for a fast baseline.
+- Move to `beam` if greedy underperforms.
+- Use `monte_carlo` for deeper exploration once you know approximate regions of interest.
+
+### Optimisation Parameters
+
+- `target.candidate_count`: Desired count of passed candidates (can be overridden via CLI/API).
+- `strategy.name`: `beam`, `greedy`, or `monte_carlo`.
+- `strategy.options`: Strategy-specific options (beam: `beam_width`; monte_carlo: `max_runs`, `seed`).
+- `constraints.max_total_changes`: Maximum number of relaxation steps.
+- `constraints.allowed_relaxations`: Which relaxation types are allowed.
+- `constraints.max_skill_changes`: Cap on total skill edits.
+- `constraints.min_years_override`: Range for lowering min years (`min`, `step`).
+- `constraints.overall_score_threshold`: Range for lowering threshold (`min`, `step`).
+- `constraints.partial_match_weight`: Range for increasing partial weight (`max`, `step`).
+- `constraints.must_have_coverage_min`: Range for lowering coverage (`min`, `step`).
+- `costs`: Per-relaxation cost used to minimize change.
+- `top_k`: Number of results returned by the API.
+
+### Optimisation API
+
+```
+POST /api/optimisation
+```
+
+Request:
+```json
+{
+  "job_id": 13,
+  "optimisation": { ... },
+  "candidate_count": 10,
+  "top_k": 5
+}
+```
+
+Response:
+```json
+{
+  "job_id": 13,
+  "target": { "candidate_count": 10, "mode": "at_least" },
+  "baseline": {
+    "candidate_count": 4,
+    "summary": { ... }
+  },
+  "results": [
+    {
+      "candidate_count": 10,
+      "cost": 2,
+      "changes": [ ... ],
+      "normalized_scenario": { ... },
+      "shock_report": { ... },
+      "summary": { ... }
+    }
+  ]
+}
+```

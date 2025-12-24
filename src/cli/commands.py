@@ -13,6 +13,8 @@ from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
 from src.what_if.runner import run_what_if
 from src.what_if.scenario import ScenarioValidationError
+from src.optimisation.runner import run_optimisation
+from src.optimisation.models import OptimisationValidationError
 
 SUPPORTED_FILE_TYPES = {".pdf", ".docx", ".txt", ".md"}
 
@@ -544,6 +546,7 @@ def list_applications(since: str, min_score: float):
             query = query.filter(Application.overall_score >= min_score)
         
         applications = query.order_by(
+            Application.job_id,
             Application.overall_score.desc(),
             Application.created_at.desc()
         ).all()
@@ -557,16 +560,26 @@ def list_applications(since: str, min_score: float):
         for app in applications:
             overall_score = _coalesce_score(app.overall_score)
             table_data.append([
+                app.job_id,
+                f"{overall_score:.1f}",
                 app.id,
                 app.candidate.name,
                 app.job.title,
                 app.job.company,
-                f"{overall_score:.1f}",
                 app.match_data.get('recommendation', 'N/A') if app.match_data else 'N/A',
                 app.created_at.strftime('%Y-%m-%d %H:%M')
             ])
         
-        headers = ['ID', 'Candidate', 'Job Title', 'Company', 'Score', 'Recommendation', 'Created']
+        headers = [
+            'Job ID',
+            'Score',
+            'Application ID',
+            'Candidate',
+            'Job Title',
+            'Company',
+            'Recommendation',
+            'Created'
+        ]
         click.echo(f"\nFound {len(applications)} application(s):\n")
         click.echo(tabulate(table_data, headers=headers, tablefmt='grid'))
         
@@ -686,6 +699,108 @@ def what_if(scenario_text, job_id, scenario_file, match_mode, partial_weight, th
         raise click.Abort()
     except Exception as exc:
         logger.error(f"What-if failed: {exc}")
+        click.echo(click.style(f"Error: {exc}", fg="red"))
+        raise click.Abort()
+    finally:
+        if db is not None:
+            db.close()
+
+
+@cli.command("optimisation")
+@click.argument("job_id", type=int)
+@click.option(
+    "--optimisation-file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to an optimisation JSON file."
+)
+@click.option(
+    "--candidates",
+    type=int,
+    help="Override the target candidate count."
+)
+@click.option(
+    "--top-k",
+    type=int,
+    help="Override how many results are produced (API only)."
+)
+@click.option(
+    "--detail",
+    is_flag=True,
+    help="Include JSON detail output after the summary table."
+)
+def optimisation(job_id, optimisation_file, candidates, top_k, detail):
+    """Run an optimisation search to reach a candidate target."""
+    db = None
+    try:
+        init_database()
+        db = get_db_session()
+
+        with open(optimisation_file, "r", encoding="utf-8") as handle:
+            optimisation_payload = json.load(handle)
+
+        result = run_optimisation(
+            db,
+            job_id=job_id,
+            optimisation_payload=optimisation_payload,
+            candidate_count_override=candidates,
+            top_k_override=top_k,
+            include_details=True,
+            include_summary_table=True,
+            include_best_only=True
+        )
+
+        results = result.get("results", [])
+        if not results:
+            click.echo("No optimisation results found.")
+            return
+
+        best = results[0]
+        summary_table = best.get("summary_table", [])
+        if not summary_table:
+            click.echo("No applications found.")
+            return
+
+        table_data = []
+        for row in summary_table:
+            original_score = _coalesce_score(row.get("original_score"))
+            scenario_score = _coalesce_score(row.get("scenario_score"))
+            table_data.append(
+                [
+                    row.get("id"),
+                    row.get("candidate"),
+                    row.get("job_title"),
+                    row.get("company"),
+                    row.get("recommendation", "N/A"),
+                    row.get("created", ""),
+                    f"{original_score:.1f}",
+                    f"{scenario_score:.1f}"
+                ]
+            )
+
+        headers = [
+            "ID",
+            "Candidate",
+            "Job Title",
+            "Company",
+            "Recommendation",
+            "Created",
+            "Original Score",
+            "Scenario Score"
+        ]
+        click.echo(tabulate(table_data, headers=headers, tablefmt='grid'))
+
+        if detail:
+            click.echo("\nCandidates:")
+            click.echo(json.dumps(best.get("candidates", []), indent=2))
+
+    except OptimisationValidationError as exc:
+        click.echo(click.style("Optimisation validation failed:", fg="red"))
+        for error in exc.errors:
+            click.echo(click.style(f"- {error}", fg="red"))
+        raise click.Abort()
+    except Exception as exc:
+        logger.error(f"Optimisation failed: {exc}")
         click.echo(click.style(f"Error: {exc}", fg="red"))
         raise click.Abort()
     finally:
