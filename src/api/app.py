@@ -14,6 +14,8 @@ from src.database.models import Candidate, Job, Application
 from src.parsers.resume_parser import ResumeParser
 from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
+from src.what_if.runner import run_what_if
+from src.what_if.scenario import ScenarioValidationError
 
 
 # Initialize database on startup
@@ -78,6 +80,17 @@ class UploadResumeResponse(BaseModel):
     message: str
 
 
+class WhatIfRequest(BaseModel):
+    job_id: int
+    scenario_text: Optional[str] = None
+    scenario: Optional[dict] = None
+    match_mode: Optional[str] = None
+    partial_match_weight: Optional[float] = None
+    overall_score_threshold: Optional[float] = None
+    include_details: Optional[bool] = False
+    summary: Optional[bool] = False
+
+
 # API Endpoints
 
 @app.get("/")
@@ -91,7 +104,8 @@ def root():
             "POST /api/jobs/upload": "Upload job description",
             "GET /api/jobs": "List jobs",
             "GET /api/candidates": "List candidates",
-            "GET /api/applications": "List applications"
+            "GET /api/applications": "List applications",
+            "POST /api/what-if": "Run a what-if scenario"
         }
     }
 
@@ -340,7 +354,10 @@ def list_applications(
         if min_score is not None:
             query = query.filter(Application.overall_score >= min_score)
         
-        applications = query.order_by(Application.created_at.desc()).all()
+        applications = query.order_by(
+            Application.overall_score.desc(),
+            Application.created_at.desc()
+        ).all()
         
         return [ApplicationResponse.from_orm(app) for app in applications]
     
@@ -349,6 +366,50 @@ def list_applications(
     except Exception as e:
         logger.error(f"Failed to list applications: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/what-if")
+def run_what_if_scenario(
+    payload: WhatIfRequest,
+    db: Session = Depends(get_db)
+):
+    """Run a what-if scenario against a job."""
+    if not payload.scenario_text and payload.scenario is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide scenario_text or scenario."
+        )
+    if payload.summary and payload.include_details:
+        raise HTTPException(
+            status_code=400,
+            detail="summary cannot be used with include_details."
+        )
+
+    overrides = {}
+    if payload.match_mode:
+        overrides["match_mode"] = payload.match_mode
+    if payload.partial_match_weight is not None:
+        overrides["partial_match_weight"] = payload.partial_match_weight
+    if payload.overall_score_threshold is not None:
+        overrides["overall_score_threshold"] = payload.overall_score_threshold
+
+    try:
+        result = run_what_if(
+            db,
+            job_id=payload.job_id,
+            scenario_text=payload.scenario_text,
+            scenario_payload=payload.scenario,
+            overrides=overrides,
+            include_details=payload.include_details,
+            include_summary=payload.summary
+        )
+    except ScenarioValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"errors": exc.errors}
+        )
+
+    return JSONResponse(content=result)
 
 
 # Health check endpoint

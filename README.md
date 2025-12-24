@@ -11,6 +11,7 @@ A Python-based system for matching candidate resumes to job descriptions with AI
 - 💻 **CLI Interface**: Command-line tools for managing the system
 - 🌐 **REST API**: FastAPI-based REST API for programmatic access
 - 📊 **Detailed Scoring**: Match scores for skills, experience, education, and overall fit
+- **What-if Analysis**: Run scenario-based matching with strict, explainable rules
 
 ## Project Structure
 
@@ -199,6 +200,55 @@ python cli.py list-applications --min-score 80
 python cli.py list-applications --since 2024-01-01 --min-score 75
 ```
 
+#### What-if Analysis
+Run scenario-based matching with a strict, explainable ruleset.
+
+Basic scenario text:
+```bash
+python cli.py what-if "require all skills and 3+ years" 13 --match-mode full --threshold 50
+```
+
+Scenario file (skip LLM parsing):
+```bash
+python cli.py what-if "-" 13 --scenario-file scenario.json --match-mode partial --partial-weight 0.5 --explain
+```
+
+Scenario JSON example:
+```json
+{
+  "scenario": {
+    "min_years_override": 3,
+    "education_required_override": null,
+    "skills_add": {
+      "must_have": [],
+      "nice_to_have": ["Experience with AWS cloud services (EC2, S3, RDS, Lambda, ECS)"]
+    },
+    "skills_remove": {
+      "must_have": [],
+      "nice_to_have": []
+    }
+  },
+  "evaluation": {
+    "match_mode": "partial_ok",
+    "partial_match_weight": 0.5,
+    "must_have_gate_mode": "coverage_min",
+    "must_have_coverage_min": 1.0,
+    "include_nice_to_have": true,
+    "weights_override": null
+  },
+  "optimization": {
+    "objective": "maximize_candidate_count",
+    "overall_score_threshold": 50
+  }
+}
+```
+
+Validation notes:
+- Unknown skills are rejected unless they already exist in the job requirements.
+- weights_override must sum to 100.
+- match_mode must be full or partial.
+- full-only mode requires match_data with full/partial matches; re-run matching for older applications.
+
 ### REST API
 
 #### Start the API Server
@@ -310,6 +360,33 @@ Response:
 ]
 ```
 
+**What-if Scenario**
+```
+POST /api/what-if
+Content-Type: application/json
+
+Request:
+{
+  "job_id": 13,
+  "scenario_text": "require all skills and 3+ years",
+  "match_mode": "full",
+  "overall_score_threshold": 50,
+  "include_details": false
+}
+
+Response:
+{
+  "job_id": 13,
+  "normalized_scenario": { ... },
+  "shock_report": { ... },
+  "warnings": [],
+  "summary": { ... }
+}
+```
+Optional fields:
+- `summary`: when true, include a `summary_table` with Original Score and Scenario Score.
+- `include_details`: when true, include per-candidate details (cannot be combined with `summary`).
+
 **Health Check**
 ```
 GET /health
@@ -332,6 +409,13 @@ curl -X POST "http://localhost:8000/api/resumes/upload?job_id=1" \
 **List applications with score filter:**
 ```bash
 curl "http://localhost:8000/api/applications?min_score=80"
+```
+
+**Run a what-if scenario:**
+```bash
+curl -X POST "http://localhost:8000/api/what-if" \
+  -H "Content-Type: application/json" \
+  -d '{"job_id":13,"scenario_text":"require all skills and 3+ years","match_mode":"full","overall_score_threshold":50}'
 ```
 
 ## Database Schema
@@ -361,6 +445,7 @@ The LLM analyzes candidates and jobs to generate scores (0-100) for:
 The match data also includes:
 - Detailed analysis for each category
 - List of matched and missing skills
+- Full and partial match breakdown for must-have and nice-to-have skills
 - Candidate strengths and weaknesses
 - Hiring recommendation (Highly Recommended, Recommended, Consider, Not Recommended)
 - Summary narrative
@@ -472,3 +557,120 @@ Potential improvements for production use:
 - Advanced filtering and search capabilities
 - Export match results to PDF/Excel
 - Candidate ranking and comparison features
+
+## What-if CLI Guide
+
+This section provides end-to-end CLI examples and a reference for scenario parameters.
+
+### Quick Start Examples
+
+Basic what-if using free-text scenario parsing:
+```bash
+python cli.py what-if "require all skills and 3+ years" 13 --match-mode full --threshold 50
+```
+
+Allow partial matches with a custom partial weight:
+```bash
+python cli.py what-if "3+ years and allow partials" 13 --match-mode partial --partial-weight 0.5 --threshold 50
+```
+
+Skip LLM parsing and pass a scenario JSON file:
+```bash
+python cli.py what-if "-" 13 --scenario-file scenario.json --match-mode partial --partial-weight 0.5
+```
+
+Show per-candidate breakdowns:
+```bash
+python cli.py what-if "require all skills" 13 --match-mode full --explain
+```
+
+Summary table output (replaces JSON detail):
+```bash
+python cli.py what-if "3+ years and allow partials" 18 --match-mode partial --partial-weight 0.5 --threshold 50 --summary
+```
+
+### Scenario Text Guide
+
+The scenario text is parsed into a strict schema. The parser only recognizes the directives below, and skills must come from the job's existing requirement lists. Unknown directives or skills are rejected.
+
+Recognized directives (examples -> JSON field):
+- "3+ years", "minimum 4 years", "set min years to 2" -> `scenario.min_years_override`
+- "ignore education", "education not required" -> `scenario.education_required_override = false`
+- "require all skills", "all must-haves" -> `evaluation.must_have_gate_mode = all` (and implies full-only)
+- "allow partial matches", "partials ok" -> `evaluation.match_mode = partial_ok`
+- "must-have coverage 0.8", "80% must-have coverage" -> `evaluation.must_have_coverage_min`
+- "exclude nice-to-haves", "ignore nice-to-have" -> `evaluation.include_nice_to_have = false`
+- "add Redis to must-haves", "remove Kubernetes" -> `scenario.skills_add` / `scenario.skills_remove`
+- "weights must-have 50, experience 30, education 20" -> `evaluation.weights_override`
+- "minimum score 60", "threshold 60" -> `optimization.overall_score_threshold`
+
+If you need exact control, use a scenario JSON file instead of free text.
+
+### Parameter Reference
+
+CLI flags:
+- `scenario_text`: Free-text scenario description parsed by the LLM.
+- `job_id`: Job ID to evaluate against.
+- `--scenario-file`: Path to a scenario JSON file; skips LLM parsing.
+- `--match-mode`: `full` counts only FULL matches; `partial` counts PARTIAL matches using `--partial-weight` when computing coverage and scores.
+- `--partial-weight`: Weight for partial matches when `--match-mode partial` is used (0.0 to 1.0).
+- `--threshold`: Overall score threshold for pass/fail (0 to 100).
+- `--explain`: Include per-candidate details in the output.
+- `--summary`: Output a list-applications style table with Original Score and Scenario Score (cannot be combined with `--explain`).
+
+Match levels:
+- **FULL match**: Clear, direct evidence in the resume that satisfies the requirement (exact skill or close synonym with concrete use).
+- **PARTIAL match**: Related or limited evidence that is relevant but not as strong or complete as the requirement.
+- **MISSING**: No relevant evidence found for the requirement.
+
+Scenario JSON parameters:
+- `scenario.min_years_override`: Override minimum years of experience (0 to 40, or null to use job default).
+- `scenario.education_required_override`: Override education requirement (true/false, or null to use job default).
+- `scenario.skills_add.must_have`: Add skills to must-have requirements (list of job-defined skills).
+- `scenario.skills_add.nice_to_have`: Add skills to nice-to-have requirements (list of job-defined skills).
+- `scenario.skills_remove.must_have`: Remove skills from must-have requirements.
+- `scenario.skills_remove.nice_to_have`: Remove skills from nice-to-have requirements.
+- `evaluation.match_mode`: `full_only` uses only FULL matches for coverage and scoring; `partial_ok` includes PARTIAL matches at the configured weight.
+- `evaluation.partial_match_weight`: Partial match weight used when `partial_ok` is selected.
+- `evaluation.must_have_gate_mode`: `all` (every must-have must be satisfied) or `coverage_min`.
+- `evaluation.must_have_coverage_min`: Minimum coverage (0.0 to 1.0) when using `coverage_min`.
+- `evaluation.include_nice_to_have`: Whether nice-to-have skills contribute to overall score.
+- `evaluation.weights_override`: Optional weights object with `must_have`, `nice_to_have`, `experience`, `education` that sums to 100.
+- `optimization.objective`: Currently `maximize_candidate_count`.
+- `optimization.overall_score_threshold`: Pass/fail threshold for optimization (0 to 100).
+
+### Example Scenario JSON
+```json
+{
+  "scenario": {
+    "min_years_override": 3,
+    "education_required_override": null,
+    "skills_add": {
+      "must_have": [],
+      "nice_to_have": []
+    },
+    "skills_remove": {
+      "must_have": [],
+      "nice_to_have": []
+    }
+  },
+  "evaluation": {
+    "match_mode": "partial_ok",
+    "partial_match_weight": 0.5,
+    "must_have_gate_mode": "coverage_min",
+    "must_have_coverage_min": 1.0,
+    "include_nice_to_have": true,
+    "weights_override": null
+  },
+  "optimization": {
+    "objective": "maximize_candidate_count",
+    "overall_score_threshold": 50
+  }
+}
+```
+
+### Validation Behavior
+- Unknown skills are rejected unless they already exist in the job requirements.
+- `weights_override` must sum to 100.
+- `match_mode` must be `full` or `partial` (CLI) and `full_only` or `partial_ok` (JSON).
+- Full-only mode requires match_data that includes full/partial breakdowns; older applications must be re-matched.

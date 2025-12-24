@@ -1,5 +1,6 @@
 """LLM-based matching service for candidates and jobs."""
 import json
+import re
 from typing import Dict, Any, Optional
 from loguru import logger
 
@@ -15,9 +16,18 @@ MATCH_SCHEMA = {
                 "score": {"type": "number", "minimum": 0, "maximum": 100},
                 "analysis": {"type": "string", "minLength": 1},
                 "matched_skills": {"type": "array", "items": {"type": "string"}},
-                "missing_skills": {"type": "array", "items": {"type": "string"}}
+                "missing_skills": {"type": "array", "items": {"type": "string"}},
+                "full_matches": {"type": "array", "items": {"type": "string"}},
+                "partial_matches": {"type": "array", "items": {"type": "string"}}
             },
-            "required": ["score", "analysis", "matched_skills", "missing_skills"]
+            "required": [
+                "score",
+                "analysis",
+                "matched_skills",
+                "missing_skills",
+                "full_matches",
+                "partial_matches"
+            ]
         },
         "nice_to_have_skills": {
             "type": "object",
@@ -25,9 +35,18 @@ MATCH_SCHEMA = {
                 "score": {"type": "number", "minimum": 0, "maximum": 100},
                 "analysis": {"type": "string", "minLength": 1},
                 "matched_skills": {"type": "array", "items": {"type": "string"}},
-                "missing_skills": {"type": "array", "items": {"type": "string"}}
+                "missing_skills": {"type": "array", "items": {"type": "string"}},
+                "full_matches": {"type": "array", "items": {"type": "string"}},
+                "partial_matches": {"type": "array", "items": {"type": "string"}}
             },
-            "required": ["score", "analysis", "matched_skills", "missing_skills"]
+            "required": [
+                "score",
+                "analysis",
+                "matched_skills",
+                "missing_skills",
+                "full_matches",
+                "partial_matches"
+            ]
         },
         "minimum_years_experience": {
             "type": "object",
@@ -341,6 +360,10 @@ class CandidateJobMatcher:
                 return False
             if not self._is_non_empty_string(bucket.get("analysis")):
                 return False
+            if not isinstance(bucket.get("full_matches"), list):
+                return False
+            if not isinstance(bucket.get("partial_matches"), list):
+                return False
 
         experience = match_data.get("minimum_years_experience")
         if not isinstance(experience, dict):
@@ -363,6 +386,84 @@ class CandidateJobMatcher:
             return False
 
         return True
+
+    def _extract_count(self, text: str, label: str) -> Optional[int]:
+        if not text:
+            return None
+
+        label_pattern = re.escape(label)
+        patterns = [
+            rf"\b(\d+)\s*{label_pattern}\b",
+            rf"\b{label_pattern}\s*\(?\s*(\d+)\b"
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if match:
+                return int(match.group(1))
+        return None
+
+    def _extract_counts_from_analysis(self, analysis: str) -> Dict[str, int]:
+        counts = {}
+        for label in ("FULL MATCH", "PARTIAL MATCH", "MISSING"):
+            count = self._extract_count(analysis, label)
+            if count is not None:
+                counts[label] = count
+        return counts
+
+    def _replace_analysis_counts(self, analysis: str, summary: str) -> str:
+        trimmed = (analysis or "").strip()
+        if not trimmed:
+            return summary
+
+        first_sentence_end = trimmed.find(". ")
+        if first_sentence_end != -1:
+            first_sentence = trimmed[:first_sentence_end + 1]
+            if any(token in first_sentence.upper() for token in ("FULL", "PARTIAL", "MISSING")):
+                return summary + " " + trimmed[first_sentence_end + 1:].lstrip()
+        return summary + " " + trimmed
+
+    def _normalize_match_counts(self, match_data: Dict[str, Any]) -> None:
+        for key in ("must_have_skills", "nice_to_have_skills"):
+            bucket = match_data.get(key, {})
+            if not isinstance(bucket, dict):
+                continue
+
+            full_matches = bucket.get("full_matches") or []
+            partial_matches = bucket.get("partial_matches") or []
+            missing_skills = bucket.get("missing_skills") or []
+
+            full_count = len(full_matches)
+            partial_count = len(partial_matches)
+            missing_count = len(missing_skills)
+            total = full_count + partial_count + missing_count
+
+            summary = (
+                f"FULL MATCH ({full_count}), "
+                f"PARTIAL MATCH ({partial_count}), "
+                f"MISSING ({missing_count})."
+            )
+
+            analysis = bucket.get("analysis", "")
+            parsed_counts = self._extract_counts_from_analysis(analysis)
+            if parsed_counts:
+                mismatch = (
+                    parsed_counts.get("FULL MATCH") not in (None, full_count)
+                    or parsed_counts.get("PARTIAL MATCH") not in (None, partial_count)
+                    or parsed_counts.get("MISSING") not in (None, missing_count)
+                )
+                if mismatch:
+                    logger.warning(
+                        "Analysis count mismatch for {}: parsed={}, computed={} (total={})",
+                        key,
+                        parsed_counts,
+                        {
+                            "FULL MATCH": full_count,
+                            "PARTIAL MATCH": partial_count,
+                            "MISSING": missing_count
+                        },
+                        total
+                    )
+                    bucket["analysis"] = self._replace_analysis_counts(analysis, summary)
     
     def match(self, candidate_data: Dict[str, Any], job_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -404,6 +505,7 @@ class CandidateJobMatcher:
                 continue
 
             if self._is_valid_match_data(match_data):
+                self._normalize_match_counts(match_data)
                 logger.info(f"Match completed. Overall score: {match_data.get('overall_score', 'N/A')}")
                 return match_data
 
@@ -415,10 +517,34 @@ class CandidateJobMatcher:
         # Return default scores if parsing fails
         return {
             "overall_score": 0,
-            "must_have_skills": {"score": 0, "analysis": "Parsing error"},
-            "nice_to_have_skills": {"score": 0, "analysis": "Parsing error"},
-            "minimum_years_experience": {"score": 0, "analysis": "Parsing error"},
-            "required_education": {"score": 0, "analysis": "Parsing error"},
+            "must_have_skills": {
+                "score": 0,
+                "analysis": "Parsing error",
+                "matched_skills": [],
+                "missing_skills": [],
+                "full_matches": [],
+                "partial_matches": []
+            },
+            "nice_to_have_skills": {
+                "score": 0,
+                "analysis": "Parsing error",
+                "matched_skills": [],
+                "missing_skills": [],
+                "full_matches": [],
+                "partial_matches": []
+            },
+            "minimum_years_experience": {
+                "score": 0,
+                "analysis": "Parsing error",
+                "candidate_years": 0,
+                "required_years": 0
+            },
+            "required_education": {
+                "score": 0,
+                "analysis": "Parsing error",
+                "candidate_education": None,
+                "required_education": None
+            },
             "summary": "Failed to generate match analysis due to parsing error",
             "strengths": [],
             "weaknesses": [],
@@ -483,6 +609,8 @@ class CandidateJobMatcher:
     - Output:
     - must_have_skills.matched_skills: list of requirement strings from job_data["requirements"]["must_have_skills"] that are FULL MATCH or PARTIAL MATCH.
     - must_have_skills.missing_skills: list of requirement strings that are MISSING (no evidence).
+    - must_have_skills.full_matches: list of requirement strings that are FULL MATCH.
+    - must_have_skills.partial_matches: list of requirement strings that are PARTIAL MATCH.
     - must_have_skills.analysis:
         - Concise explanation of which requirements are fully met, which are partially met (and why), and which are missing.
         - Explicitly state how many are FULL MATCH, how many are PARTIAL MATCH, and how many are MISSING.
@@ -514,6 +642,8 @@ class CandidateJobMatcher:
     - Output:
     - nice_to_have_skills.matched_skills: requirement strings from job_data["requirements"]["nice_to_have_skills"] that are FULL MATCH or PARTIAL MATCH.
     - nice_to_have_skills.missing_skills: requirement strings that are MISSING.
+    - nice_to_have_skills.full_matches: requirement strings that are FULL MATCH.
+    - nice_to_have_skills.partial_matches: requirement strings that are PARTIAL MATCH.
     - nice_to_have_skills.analysis:
         - Concise explanation grounded in evidence.
         - Explicitly state how many are FULL MATCH, how many are PARTIAL MATCH, and how many are MISSING.
@@ -607,7 +737,9 @@ class CandidateJobMatcher:
         "score": number,
         "analysis": string,
         "matched_skills": [strings from job_data.requirements.must_have_skills],
-        "missing_skills": [strings from job_data.requirements.must_have_skills]
+        "missing_skills": [strings from job_data.requirements.must_have_skills],
+        "full_matches": [strings from job_data.requirements.must_have_skills],
+        "partial_matches": [strings from job_data.requirements.must_have_skills]
     }}
     - nice_to_have_skills: same structure using job_data.requirements.nice_to_have_skills
     - minimum_years_experience: {{

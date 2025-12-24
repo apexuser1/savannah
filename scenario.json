@@ -1,0 +1,35 @@
+{
+  "scenario": {
+    "min_years_override": 3,
+    "education_required_override": false,
+    "skills_add": { "must_have": [], "nice_to_have": [] },
+    "skills_remove": {
+      "must_have": [
+        "Azure",
+        "Terraform",
+        "CloudFormation",
+        "Kubernetes",
+        "Python",
+        "Go",
+        "Jenkins",
+        "GitLab CI",
+        "GitHub Actions",
+        "Prometheus",
+        "Grafana"
+      ],
+      "nice_to_have": []
+    }
+  },
+  "evaluation": {
+    "match_mode": "partial_ok",
+    "partial_match_weight": 0.5,
+    "must_have_gate_mode": "coverage_min",
+    "must_have_coverage_min": 1.0,
+    "include_nice_to_have": true,
+    "weights_override": null
+  },
+  "optimization": {
+    "objective": "maximize_candidate_count",
+    "overall_score_threshold": 50
+  }
+}

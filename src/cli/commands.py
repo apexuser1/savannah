@@ -1,4 +1,5 @@
 """CLI commands for the Resume Job Matcher."""
+import json
 import click
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,8 @@ from src.database.models import Candidate, Job, Application
 from src.parsers.resume_parser import ResumeParser
 from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
+from src.what_if.runner import run_what_if
+from src.what_if.scenario import ScenarioValidationError
 
 SUPPORTED_FILE_TYPES = {".pdf", ".docx", ".txt", ".md"}
 
@@ -328,10 +331,13 @@ def directory_load(directory_path: str):
         db = get_db_session()
 
         base_dir = Path(directory_path)
-        job_dirs = sorted(
-            [path for path in base_dir.iterdir() if path.is_dir()],
-            key=lambda path: path.name.lower()
-        )
+        if (base_dir / "applications").is_dir():
+            job_dirs = [base_dir]
+        else:
+            job_dirs = sorted(
+                [path for path in base_dir.iterdir() if path.is_dir()],
+                key=lambda path: path.name.lower()
+            )
 
         if not job_dirs:
             errors.append(f"No job directories found in {base_dir}")
@@ -537,7 +543,10 @@ def list_applications(since: str, min_score: float):
         if min_score is not None:
             query = query.filter(Application.overall_score >= min_score)
         
-        applications = query.order_by(Application.created_at.desc()).all()
+        applications = query.order_by(
+            Application.overall_score.desc(),
+            Application.created_at.desc()
+        ).all()
         
         if not applications:
             click.echo("No applications found.")
@@ -567,6 +576,121 @@ def list_applications(since: str, min_score: float):
         logger.error(f"Failed to list applications: {e}")
         click.echo(click.style(f"✗ Error: {e}", fg="red"))
         raise click.Abort()
+
+
+@cli.command("what-if")
+@click.argument("scenario_text", required=True)
+@click.argument("job_id", type=int)
+@click.option("--scenario-file", type=click.Path(exists=True), help="Path to a scenario JSON file (skips LLM parsing).")
+@click.option("--match-mode", type=click.Choice(["full", "partial"]), help="Use full-only matches or allow partial matches.")
+@click.option("--partial-weight", type=float, help="Weight for partial matches when match-mode is partial.")
+@click.option("--threshold", type=float, help="Overall score threshold for pass/fail.")
+@click.option("--explain", is_flag=True, help="Include per-candidate details in the output.")
+@click.option("--summary", is_flag=True, help="Output a summary table instead of JSON details.")
+def what_if(scenario_text, job_id, scenario_file, match_mode, partial_weight, threshold, explain, summary):
+    """Run a what-if scenario against an existing job."""
+    db = None
+    try:
+        if summary and explain:
+            click.echo(click.style("--summary cannot be used with --explain.", fg="red"))
+            raise click.Abort()
+
+        init_database()
+        db = get_db_session()
+
+        scenario_payload = None
+        if scenario_file:
+            with open(scenario_file, "r", encoding="utf-8") as handle:
+                scenario_payload = json.load(handle)
+        elif not scenario_text:
+            click.echo(click.style("Scenario text or --scenario-file is required.", fg="red"))
+            raise click.Abort()
+
+        overrides = {}
+        if match_mode:
+            overrides["match_mode"] = match_mode
+        if partial_weight is not None:
+            overrides["partial_match_weight"] = partial_weight
+        if threshold is not None:
+            overrides["overall_score_threshold"] = threshold
+
+        result = run_what_if(
+            db,
+            job_id=job_id,
+            scenario_text=None if scenario_payload else scenario_text,
+            scenario_payload=scenario_payload,
+            overrides=overrides,
+            include_details=explain,
+            include_summary=summary
+        )
+
+        if summary:
+            summary_table = result.get("summary_table", [])
+            if not summary_table:
+                click.echo("No applications found.")
+                return
+
+            table_data = []
+            for row in summary_table:
+                original_score = _coalesce_score(row.get("original_score"))
+                scenario_score = _coalesce_score(row.get("scenario_score"))
+                table_data.append(
+                    [
+                        row.get("id"),
+                        row.get("candidate"),
+                        row.get("job_title"),
+                        row.get("company"),
+                        row.get("recommendation", "N/A"),
+                        row.get("created", ""),
+                        f"{original_score:.1f}",
+                        f"{scenario_score:.1f}"
+                    ]
+                )
+
+            headers = [
+                "ID",
+                "Candidate",
+                "Job Title",
+                "Company",
+                "Recommendation",
+                "Created",
+                "Original Score",
+                "Scenario Score"
+            ]
+            click.echo(tabulate(table_data, headers=headers, tablefmt='grid'))
+            return
+
+        click.echo("Normalized scenario:")
+        click.echo(json.dumps(result["normalized_scenario"], indent=2))
+        click.echo("\nShock report:")
+        click.echo(json.dumps(result["shock_report"], indent=2))
+
+        warnings = result.get("warnings") or []
+        if warnings:
+            click.echo("\nWarnings:")
+            for warning in warnings:
+                click.echo(f"- {warning}")
+
+        summary = result.get("summary", {})
+        click.echo("\nSummary:")
+        click.echo(json.dumps(summary, indent=2))
+
+        if explain:
+            click.echo("\nCandidates:")
+            click.echo(json.dumps(result.get("candidates", []), indent=2))
+
+    except ScenarioValidationError as exc:
+        click.echo(click.style("Scenario validation failed:", fg="red"))
+        for error in exc.errors:
+            click.echo(click.style(f"- {error}", fg="red"))
+        raise click.Abort()
+    except Exception as exc:
+        logger.error(f"What-if failed: {exc}")
+        click.echo(click.style(f"Error: {exc}", fg="red"))
+        raise click.Abort()
+    finally:
+        if db is not None:
+            db.close()
 
 
 if __name__ == '__main__':
