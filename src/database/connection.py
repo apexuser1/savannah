@@ -21,7 +21,12 @@ def init_db():
         Config.validate()
         logger.info("Initializing database connection...")
         
-        engine = create_engine(Config.DATABASE_URL, echo=False)
+        engine = create_engine(
+            Config.DATABASE_URL,
+            echo=False,
+            pool_pre_ping=True,
+            pool_recycle=300
+        )
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
         # Import models to register them with Base

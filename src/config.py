@@ -1,6 +1,7 @@
 """Configuration management for the Resume Job Matcher."""
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -35,6 +36,20 @@ class Config:
     
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+    # API
+    API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+    @classmethod
+    def api_port(cls) -> int:
+        parsed = urlparse(cls.API_BASE_URL)
+        if parsed.port:
+            return parsed.port
+        if parsed.scheme == "https":
+            return 443
+        if parsed.scheme == "http":
+            return 80
+        return 8000
     
     @classmethod
     def validate(cls):
