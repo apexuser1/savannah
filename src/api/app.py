@@ -4,20 +4,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, cast
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from loguru import logger
 
 from src.database.connection import get_db, init_db
-from src.database.models import Candidate, Job, Application
+from src.database.models import (
+    Candidate,
+    Job,
+    Application,
+    WhatIfScenario,
+    OptimisationRecord
+)
 from src.parsers.resume_parser import ResumeParser
 from src.parsers.job_parser import JobParser
 from src.matching.matcher import match_candidate_to_job
 from src.what_if.runner import run_what_if
-from src.what_if.scenario import ScenarioValidationError
+from src.what_if.scenario import ScenarioValidationError, normalize_scenario
 from src.optimisation.runner import run_optimisation
-from src.optimisation.models import OptimisationValidationError
+from src.optimisation.models import OptimisationValidationError, load_optimisation_config
 from src.optimisation.api_models import OptimisationRequest
 
 
@@ -29,6 +36,15 @@ app = FastAPI(
     title="Resume Job Matcher API",
     description="API for matching candidate resumes to job descriptions",
     version="1.0.0"
+)
+
+# Allow the UI to call the API during prototyping.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 
@@ -46,6 +62,21 @@ class CandidateResponse(BaseModel):
         from_attributes = True
 
 
+class CandidateDetailResponse(BaseModel):
+    id: int
+    resume_data: dict
+    name: Optional[str]
+    email: Optional[str]
+    phone: Optional[str]
+    original_filename: Optional[str]
+    file_type: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class JobResponse(BaseModel):
     id: int
     title: Optional[str]
@@ -55,6 +86,21 @@ class JobResponse(BaseModel):
     file_type: Optional[str]
     created_at: datetime
     
+    class Config:
+        from_attributes = True
+
+
+class JobDetailResponse(BaseModel):
+    id: int
+    job_data: dict
+    title: Optional[str]
+    company: Optional[str]
+    location: Optional[str]
+    original_filename: Optional[str]
+    file_type: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
     class Config:
         from_attributes = True
 
@@ -94,6 +140,42 @@ class WhatIfRequest(BaseModel):
     summary: Optional[bool] = False
 
 
+class WhatIfScenarioCreateRequest(BaseModel):
+    job_id: int
+    name: Optional[str] = None
+    scenario: dict
+
+
+class WhatIfScenarioResponse(BaseModel):
+    id: int
+    job_id: int
+    name: Optional[str]
+    scenario_payload: dict
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class OptimisationCreateRequest(BaseModel):
+    job_id: int
+    name: Optional[str] = None
+    optimisation: dict
+
+
+class OptimisationRecordResponse(BaseModel):
+    id: int
+    job_id: int
+    name: Optional[str]
+    optimisation_payload: dict
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # API Endpoints
 
 @app.get("/")
@@ -106,10 +188,17 @@ def root():
             "POST /api/resumes/upload": "Upload resume with job_id",
             "POST /api/jobs/upload": "Upload job description",
             "GET /api/jobs": "List jobs",
+            "GET /api/jobs/{job_id}": "Get job details",
             "GET /api/candidates": "List candidates",
+            "GET /api/candidates/{candidate_id}": "Get candidate details",
             "GET /api/applications": "List applications",
+            "GET /api/applications/{application_id}": "Get application details",
             "POST /api/what-if": "Run a what-if scenario",
-            "POST /api/optimisation": "Run an optimisation search"
+            "GET /api/what-if/scenarios": "List stored what-if scenarios",
+            "POST /api/what-if/scenarios": "Store a what-if scenario",
+            "POST /api/optimisation": "Run an optimisation search",
+            "GET /api/optimisations": "List stored optimisation configs",
+            "POST /api/optimisations": "Store an optimisation config"
         }
     }
 
@@ -314,6 +403,24 @@ def list_jobs(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/jobs/{job_id}", response_model=JobDetailResponse)
+def get_job(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a job with full structured data."""
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job with ID {job_id} not found")
+        return JobDetailResponse.from_orm(job)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch job {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/candidates", response_model=List[CandidateResponse])
 def list_candidates(
     since: Optional[str] = Query(None, description="Filter candidates created since date (YYYY-MM-DD)"),
@@ -342,10 +449,32 @@ def list_candidates(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/candidates/{candidate_id}", response_model=CandidateDetailResponse)
+def get_candidate(
+    candidate_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a candidate with full resume data."""
+    try:
+        candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+        if not candidate:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Candidate with ID {candidate_id} not found"
+            )
+        return CandidateDetailResponse.from_orm(candidate)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch candidate {candidate_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/applications", response_model=List[ApplicationResponse])
 def list_applications(
     since: Optional[str] = Query(None, description="Filter applications created since date (YYYY-MM-DD)"),
     min_score: Optional[float] = Query(None, description="Filter by minimum overall score (0-100)", ge=0, le=100),
+    job_id: Optional[int] = Query(None, description="Filter by job ID"),
     db: Session = Depends(get_db)
 ):
     """List applications with optional filters."""
@@ -362,6 +491,8 @@ def list_applications(
         
         if min_score is not None:
             query = query.filter(Application.overall_score >= min_score)
+        if job_id is not None:
+            query = query.filter(Application.job_id == job_id)
         
         applications = query.order_by(
             Application.job_id,
@@ -375,6 +506,181 @@ def list_applications(
         raise
     except Exception as e:
         logger.error(f"Failed to list applications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/applications/{application_id}", response_model=ApplicationResponse)
+def get_application(
+    application_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get an application with match data."""
+    try:
+        application = db.query(Application).filter(Application.id == application_id).first()
+        if not application:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Application with ID {application_id} not found"
+            )
+        return ApplicationResponse.from_orm(application)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch application {application_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/what-if/scenarios", response_model=List[WhatIfScenarioResponse])
+def list_what_if_scenarios(
+    job_id: Optional[int] = Query(None, description="Filter by job ID"),
+    db: Session = Depends(get_db)
+):
+    """List stored what-if scenarios."""
+    try:
+        query = db.query(WhatIfScenario)
+        if job_id is not None:
+            query = query.filter(WhatIfScenario.job_id == job_id)
+        scenarios = query.order_by(WhatIfScenario.created_at.desc()).all()
+        return [WhatIfScenarioResponse.from_orm(item) for item in scenarios]
+    except Exception as e:
+        logger.error(f"Failed to list what-if scenarios: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/what-if/scenarios/{scenario_id}", response_model=WhatIfScenarioResponse)
+def get_what_if_scenario(
+    scenario_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a stored what-if scenario."""
+    try:
+        scenario = db.query(WhatIfScenario).filter(WhatIfScenario.id == scenario_id).first()
+        if not scenario:
+            raise HTTPException(
+                status_code=404,
+                detail=f"What-if scenario {scenario_id} not found"
+            )
+        return WhatIfScenarioResponse.from_orm(scenario)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch what-if scenario {scenario_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/what-if/scenarios", response_model=WhatIfScenarioResponse)
+def create_what_if_scenario(
+    payload: WhatIfScenarioCreateRequest,
+    db: Session = Depends(get_db)
+):
+    """Store a validated what-if scenario."""
+    try:
+        job = db.query(Job).filter(Job.id == payload.job_id).first()
+        if not job:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Job with ID {payload.job_id} not found"
+            )
+
+        try:
+            normalized, _warnings = normalize_scenario(
+                payload.scenario,
+                job.job_data,
+                strict=True
+            )
+        except ScenarioValidationError as exc:
+            raise HTTPException(status_code=422, detail={"errors": exc.errors})
+
+        record = WhatIfScenario(
+            job_id=payload.job_id,
+            name=payload.name,
+            scenario_payload=normalized
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return WhatIfScenarioResponse.from_orm(record)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to store what-if scenario: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/optimisations", response_model=List[OptimisationRecordResponse])
+def list_optimisations(
+    job_id: Optional[int] = Query(None, description="Filter by job ID"),
+    db: Session = Depends(get_db)
+):
+    """List stored optimisation configs."""
+    try:
+        query = db.query(OptimisationRecord)
+        if job_id is not None:
+            query = query.filter(OptimisationRecord.job_id == job_id)
+        records = query.order_by(OptimisationRecord.created_at.desc()).all()
+        return [OptimisationRecordResponse.from_orm(item) for item in records]
+    except Exception as e:
+        logger.error(f"Failed to list optimisations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/optimisations/{optimisation_id}", response_model=OptimisationRecordResponse)
+def get_optimisation(
+    optimisation_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a stored optimisation config."""
+    try:
+        record = (
+            db.query(OptimisationRecord)
+            .filter(OptimisationRecord.id == optimisation_id)
+            .first()
+        )
+        if not record:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Optimisation {optimisation_id} not found"
+            )
+        return OptimisationRecordResponse.from_orm(record)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch optimisation {optimisation_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/optimisations", response_model=OptimisationRecordResponse)
+def create_optimisation(
+    payload: OptimisationCreateRequest,
+    db: Session = Depends(get_db)
+):
+    """Store a validated optimisation config."""
+    try:
+        job = db.query(Job).filter(Job.id == payload.job_id).first()
+        if not job:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Job with ID {payload.job_id} not found"
+            )
+
+        try:
+            load_optimisation_config(payload.optimisation)
+        except OptimisationValidationError as exc:
+            raise HTTPException(status_code=422, detail={"errors": exc.errors})
+
+        record = OptimisationRecord(
+            job_id=payload.job_id,
+            name=payload.name,
+            optimisation_payload=payload.optimisation
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return OptimisationRecordResponse.from_orm(record)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to store optimisation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -429,15 +735,19 @@ def run_optimisation_search(
 ):
     """Run an optimisation search against a job."""
     try:
+        include_details = bool(payload.include_details)
+        include_summary = bool(payload.summary)
+        include_best_only = True if payload.best_only is None else bool(payload.best_only)
+
         result = run_optimisation(
             db,
             job_id=payload.job_id,
             optimisation_payload=payload.optimisation,
             candidate_count_override=payload.candidate_count,
             top_k_override=payload.top_k,
-            include_details=False,
-            include_summary_table=False,
-            include_best_only=True
+            include_details=include_details,
+            include_summary_table=include_summary,
+            include_best_only=include_best_only
         )
     except OptimisationValidationError as exc:
         raise HTTPException(

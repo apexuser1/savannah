@@ -107,7 +107,15 @@ LOG_LEVEL=INFO
 python cli.py init-db
 ```
 
-This will create all necessary tables (candidates, jobs, applications).
+This will create all necessary tables (candidates, jobs, applications, what_if_scenarios, optimisations).
+
+If you already have a database created before the what-if/optimisation features, you can also apply the SQL directly:
+
+```bash
+psql "$DATABASE_URL" -f schema_what_if_optimisation.sql
+```
+
+This SQL creates the `what_if_scenarios` and `optimisations` tables for stored scenario payloads.
 
 ## Usage
 
@@ -166,6 +174,33 @@ Match Scores:
 
   Summary: This candidate is a strong match for the position...
 ```
+
+#### Directory Load (bulk ingest)
+Load a directory of job folders and their applications in one command.
+
+```bash
+python cli.py directory-load path/to/data
+```
+
+Directory structure:
+
+```
+data/
+  job_alpha/
+    job_description.pdf
+    applications/
+      candidate_1.pdf
+      candidate_2.docx
+  job_beta/
+    job.md
+    applications/
+      jane_doe_resume.pdf
+```
+
+Notes:
+- Each job folder must contain exactly one job description file.
+- Each job folder must include an `applications/` subfolder with resumes.
+- If the provided path already contains an `applications/` folder, it is treated as a single job folder.
 
 #### List Jobs
 ```bash

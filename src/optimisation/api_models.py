@@ -9,3 +9,6 @@ class OptimisationRequest(BaseModel):
     optimisation: Dict[str, Any]
     candidate_count: Optional[int] = None
     top_k: Optional[int] = None
+    include_details: Optional[bool] = False
+    summary: Optional[bool] = False
+    best_only: Optional[bool] = True

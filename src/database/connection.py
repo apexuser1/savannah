@@ -30,7 +30,13 @@ def init_db():
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
         # Import models to register them with Base
-        from src.database.models import Candidate, Job, Application
+        from src.database.models import (
+            Candidate,
+            Job,
+            Application,
+            WhatIfScenario,
+            OptimisationRecord
+        )
         
         # Create all tables
         Base.metadata.create_all(bind=engine)

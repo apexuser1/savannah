@@ -1,6 +1,7 @@
 """SQLAlchemy database models."""
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, Float, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from src.database.connection import Base
@@ -55,6 +56,8 @@ class Job(Base):
     
     # Relationships
     applications = relationship("Application", back_populates="job")
+    what_if_scenarios = relationship("WhatIfScenario", back_populates="job")
+    optimisations = relationship("OptimisationRecord", back_populates="job")
     
     def __repr__(self):
         return f"<Job(id={self.id}, title='{self.title}', company='{self.company}')>"
@@ -92,3 +95,41 @@ class Application(Base):
     
     def __repr__(self):
         return f"<Application(id={self.id}, candidate_id={self.candidate_id}, job_id={self.job_id}, score={self.overall_score})>"
+
+
+class WhatIfScenario(Base):
+    """Stored what-if scenario configuration."""
+    __tablename__ = "what_if_scenarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False, index=True)
+
+    name = Column(String, index=True)
+    scenario_payload = Column(JSONB, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    job = relationship("Job", back_populates="what_if_scenarios")
+
+    def __repr__(self):
+        return f"<WhatIfScenario(id={self.id}, job_id={self.job_id}, name='{self.name}')>"
+
+
+class OptimisationRecord(Base):
+    """Stored optimisation configuration."""
+    __tablename__ = "optimisations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False, index=True)
+
+    name = Column(String, index=True)
+    optimisation_payload = Column(JSONB, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    job = relationship("Job", back_populates="optimisations")
+
+    def __repr__(self):
+        return f"<OptimisationRecord(id={self.id}, job_id={self.job_id}, name='{self.name}')>"

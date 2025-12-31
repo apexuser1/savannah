@@ -287,7 +287,9 @@ def what_if(scenario_text, job_id, scenario_file, match_mode, partial_weight, th
 @click.option("--optimisation-file", required=True, type=click.Path(exists=True))
 @click.option("--candidates", type=int, help="Override the target candidate count.")
 @click.option("--top-k", type=int, help="Override how many results are returned.")
-def optimisation(job_id, optimisation_file, candidates, top_k):
+@click.option("--detail", is_flag=True, help="Include JSON detail output after the summary table.")
+@click.option("--raw", is_flag=True, help="Output raw JSON response instead of a table.")
+def optimisation(job_id, optimisation_file, candidates, top_k, detail, raw):
     """Run an optimisation search against a job."""
     payload = {"job_id": job_id}
     try:
@@ -301,12 +303,62 @@ def optimisation(job_id, optimisation_file, candidates, top_k):
         payload["candidate_count"] = candidates
     if top_k is not None:
         payload["top_k"] = top_k
+    if not raw:
+        payload["summary"] = True
+        payload["include_details"] = detail
+        payload["best_only"] = True
 
     try:
         with httpx.Client(base_url=API_BASE_URL, timeout=60.0) as client:
             response = client.post("/api/optimisation", json=payload)
         result = _request_json(response)
-        click.echo(json.dumps(result, indent=2))
+        if raw:
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        results = result.get("results", [])
+        if not results:
+            click.echo("No optimisation results found.")
+            return
+
+        best = results[0]
+        summary_table = best.get("summary_table", [])
+        if not summary_table:
+            click.echo("No applications found.")
+            return
+
+        table_data = []
+        for row in summary_table:
+            original_score = _coalesce_score(row.get("original_score"))
+            scenario_score = _coalesce_score(row.get("scenario_score"))
+            table_data.append(
+                [
+                    row.get("id"),
+                    row.get("candidate"),
+                    row.get("job_title"),
+                    row.get("company"),
+                    row.get("recommendation", "N/A"),
+                    row.get("created", ""),
+                    f"{original_score:.1f}",
+                    f"{scenario_score:.1f}"
+                ]
+            )
+
+        headers = [
+            "ID",
+            "Candidate",
+            "Job Title",
+            "Company",
+            "Recommendation",
+            "Created",
+            "Original Score",
+            "Scenario Score"
+        ]
+        click.echo(tabulate(table_data, headers=headers, tablefmt='grid'))
+
+        if detail:
+            click.echo("\nCandidates:")
+            click.echo(json.dumps(best.get("candidates", []), indent=2))
     except Exception as e:
         click.echo(click.style(f"Error: {e}", fg="red"))
         raise click.Abort()
@@ -403,7 +455,8 @@ def list_candidates(since: str):
 @cli.command()
 @click.option('--since', type=str, help='Filter applications created since date (YYYY-MM-DD)')
 @click.option('--min-score', type=float, help='Filter by minimum overall score (0-100)')
-def list_applications(since: str, min_score: float):
+@click.option('--job-id', type=int, help='Filter by job ID')
+def list_applications(since: str, min_score: float, job_id: int):
     """List applications with optional filters."""
     try:
         params = {}
@@ -411,6 +464,8 @@ def list_applications(since: str, min_score: float):
             params["since"] = since
         if min_score is not None:
             params["min_score"] = min_score
+        if job_id is not None:
+            params["job_id"] = job_id
         with httpx.Client(base_url=API_BASE_URL, timeout=30.0) as client:
             response = client.get("/api/applications", params=params)
         applications = _request_json(response)
