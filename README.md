@@ -469,21 +469,57 @@ curl -X POST "http://localhost:8000/api/what-if" \
 
 ## Match Scoring
 
-The LLM analyzes candidates and jobs to generate scores (0-100) for:
+During resume upload, the LLM produces structured match_data and scores
+(0-100) using only parsed resume and job data.
 
-1. **Must-Have Skills**: Match against required technical skills
-2. **Nice-to-Have Skills**: Match against preferred skills
-3. **Minimum Years Experience**: Whether candidate meets experience requirements
-4. **Required Education**: Whether candidate meets education requirements
-5. **Overall Score**: Comprehensive match score
+Inputs:
+- job_data["requirements"]["must_have_skills"]
+- job_data["requirements"]["nice_to_have_skills"]
+- job_data["requirements"]["minimum_years_experience"]
+- job_data["requirements"]["required_education"]
 
-The match data also includes:
-- Detailed analysis for each category
-- List of matched and missing skills
-- Full and partial match breakdown for must-have and nice-to-have skills
-- Candidate strengths and weaknesses
-- Hiring recommendation (Highly Recommended, Recommended, Consider, Not Recommended)
-- Summary narrative
+Scoring rules:
+1. **Must-Have Skills**: For N requirements, FULL matches = M and PARTIAL
+   matches = P. score = round(100 * (M + 0.5 * P) / N). If N == 0, score = 50.
+   matched_skills = FULL + PARTIAL; missing_skills = no evidence.
+2. **Nice-to-Have Skills**: Same formula and 50 default when empty.
+3. **Minimum Years Experience**: required_years from job; candidate_years from
+   work dates. score = min(100, round(100 * candidate_years / required_years)).
+   If required_years is 0, score = 50.
+4. **Required Education**: score = 100 if level + field clearly met, 0 if
+   below, 50 if unclear or not required.
+5. **Overall Score**: Weighted average of component scores
+   (must_have 45, nice_to_have 20, experience 20, education 15), rounded to 1
+   decimal.
+6. **Recommendation**: Based on overall_score:
+   >=85 Highly Recommended, >=70 Recommended, >=50 Consider, else Not Recommended.
+
+Notes:
+- Partial match weight for original application scores is fixed at 0.5 in the
+  LLM prompt.
+- What-if evaluation can override weighting via match_mode and
+  partial_match_weight (see "Partial Matches").
+
+## Partial Matches
+
+Partial matches are determined during LLM matching and then reweighted during
+what-if and optimization evaluation. They are not reclassified later.
+
+Process overview:
+- Job creation: the job parser extracts requirement lists (must_have_skills,
+  nice_to_have_skills, minimum years, education). No partials exist yet.
+- Application creation (resume upload): the LLM compares each requirement to
+  resume evidence and labels it FULL, PARTIAL, or MISSING. Partial means
+  related or limited evidence; full means direct, strong evidence. The
+  full_matches and partial_matches lists are stored in application match_data.
+- Scenario evaluation (what-if): the evaluator recomputes coverage and scores
+  from stored full/partial lists. match_mode controls whether partials count:
+  full_only ignores partials; partial_ok counts partials at
+  partial_match_weight (default 0.5). Gate rules then decide pass/fail.
+  Legacy match_data without full/partial lists cannot be used for full_only.
+- Optimization: relaxation strategies can enable partials or increase the
+  partial weight, but they only change how stored partials are counted. They do
+  not change the underlying FULL/PARTIAL labels.
 
 ## JSON Resume Format
 
