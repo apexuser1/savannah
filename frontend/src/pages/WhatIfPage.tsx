@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   Accordion,
   AccordionDetails,
@@ -11,6 +11,7 @@ import {
   Chip,
   Divider,
   FormControlLabel,
+  Menu,
   MenuItem,
   Paper,
   Radio,
@@ -33,14 +34,16 @@ import {
   Typography
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import { useLocation, useNavigate, type Location } from 'react-router-dom'
 import {
+  fetchApplication,
   fetchJob,
   fetchJobs,
   fetchWhatIfScenarios,
   runWhatIf,
   saveWhatIfScenario
 } from '../api/client'
-import type { Job, WhatIfResult, WhatIfScenario } from '../types'
+import type { Job, SummaryRow, WhatIfResult, WhatIfScenario } from '../types'
 
 const formatScore = (value?: number) =>
   typeof value === 'number' ? value.toFixed(1) : 'N/A'
@@ -100,6 +103,10 @@ const WhatIfPage = () => {
   const [scenarioName, setScenarioName] = useState('')
   const [activeStep, setActiveStep] = useState(0)
   const skipResetRef = useRef(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const state = location.state as { backgroundLocation?: Location } | null
+  const modalState = { backgroundLocation: state?.backgroundLocation ?? location }
 
   const [skillsAddMust, setSkillsAddMust] = useState<string[]>([])
   const [skillsAddNice, setSkillsAddNice] = useState<string[]>([])
@@ -130,6 +137,11 @@ const WhatIfPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number
+    mouseY: number
+    row?: SummaryRow
+  } | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -293,6 +305,57 @@ const WhatIfPage = () => {
 
   const summaryTable = result?.summary_table ?? []
   const selectedJob = jobs.find((job) => job.id === Number(selectedJobId))
+
+  const handleContextMenu = (event: MouseEvent, row: SummaryRow) => {
+    event.preventDefault()
+    setContextMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      row
+    })
+  }
+
+  const handleMenuClose = () => {
+    setContextMenu(null)
+  }
+
+  const handleShowJob = () => {
+    if (selectedJobId) {
+      navigate(`/jobs/${selectedJobId}`, { state: modalState })
+    }
+    handleMenuClose()
+  }
+
+  const handleShowApplication = (suffix = '') => {
+    const applicationId = contextMenu?.row?.id
+    if (typeof applicationId === 'number') {
+      navigate(`/applications/${applicationId}${suffix}`, { state: modalState })
+    }
+    handleMenuClose()
+  }
+
+  const handleShowCandidate = async (showResume: boolean) => {
+    const applicationId = contextMenu?.row?.id
+    handleMenuClose()
+    if (typeof applicationId !== 'number') {
+      return
+    }
+    try {
+      const application = await fetchApplication(applicationId)
+      if (application.candidate_id) {
+        navigate(
+          `/candidates/${application.candidate_id}${
+            showResume ? '/resume' : ''
+          }`,
+          { state: modalState }
+        )
+      } else {
+        setError('Candidate not available for this application.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load candidate')
+    }
+  }
 
   const handleRun = async (
     payloadScenario?: Record<string, unknown>,
@@ -1019,7 +1082,12 @@ const WhatIfPage = () => {
               </TableHead>
               <TableBody>
                 {summaryTable.map((row, index) => (
-                  <TableRow key={`${row.id ?? index}`}>
+                  <TableRow
+                    key={`${row.id ?? index}`}
+                    hover
+                    onContextMenu={(event) => handleContextMenu(event, row)}
+                    sx={{ cursor: 'context-menu' }}
+                  >
                     <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                       <Typography variant="body2" fontWeight={600}>
                         {row.candidate || 'Unknown'}
@@ -1110,6 +1178,45 @@ const WhatIfPage = () => {
           </TableContainer>
         </Stack>
       </Paper>
+
+      <Menu
+        open={Boolean(contextMenu)}
+        onClose={handleMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem disabled={!selectedJobId} onClick={handleShowJob}>
+          Show job
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowCandidate(false)}
+        >
+          Show candidate
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowCandidate(true)}
+        >
+          Show resume
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowApplication('')}
+        >
+          Show application
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowApplication('/appraisal')}
+        >
+          Show appraisal
+        </MenuItem>
+      </Menu>
     </Stack>
   )
 }

@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   Accordion,
   AccordionDetails,
@@ -13,6 +13,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  Menu,
   MenuItem,
   Paper,
   Stack,
@@ -34,7 +35,9 @@ import {
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import { useLocation, useNavigate, type Location } from 'react-router-dom'
 import {
+  fetchApplication,
   fetchJobs,
   fetchOptimisations,
   runOptimisation,
@@ -161,6 +164,10 @@ const OptimisationsPage = () => {
   const [selectedJobId, setSelectedJobId] = useState<number | ''>('')
   const [scenarioName, setScenarioName] = useState('')
   const [activeStep, setActiveStep] = useState(0)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const state = location.state as { backgroundLocation?: Location } | null
+  const modalState = { backgroundLocation: state?.backgroundLocation ?? location }
 
   const [candidateTarget, setCandidateTarget] = useState(10)
   const [topK, setTopK] = useState(5)
@@ -187,6 +194,11 @@ const OptimisationsPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number
+    mouseY: number
+    row?: SummaryRow
+  } | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -419,6 +431,57 @@ const OptimisationsPage = () => {
   const baselineSummary = result?.baseline?.summary as
     | { average_score?: number }
     | undefined
+
+  const handleContextMenu = (event: MouseEvent, row: SummaryRow) => {
+    event.preventDefault()
+    setContextMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      row
+    })
+  }
+
+  const handleMenuClose = () => {
+    setContextMenu(null)
+  }
+
+  const handleShowJob = () => {
+    if (selectedJobId) {
+      navigate(`/jobs/${selectedJobId}`, { state: modalState })
+    }
+    handleMenuClose()
+  }
+
+  const handleShowApplication = (suffix = '') => {
+    const applicationId = contextMenu?.row?.id
+    if (typeof applicationId === 'number') {
+      navigate(`/applications/${applicationId}${suffix}`, { state: modalState })
+    }
+    handleMenuClose()
+  }
+
+  const handleShowCandidate = async (showResume: boolean) => {
+    const applicationId = contextMenu?.row?.id
+    handleMenuClose()
+    if (typeof applicationId !== 'number') {
+      return
+    }
+    try {
+      const application = await fetchApplication(applicationId)
+      if (application.candidate_id) {
+        navigate(
+          `/candidates/${application.candidate_id}${
+            showResume ? '/resume' : ''
+          }`,
+          { state: modalState }
+        )
+      } else {
+        setError('Candidate not available for this application.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load candidate')
+    }
+  }
 
   const storedRows = useMemo(() => {
     return [...optimisations]
@@ -1086,7 +1149,12 @@ const OptimisationsPage = () => {
               </TableHead>
               <TableBody>
                 {bestSummaryTable.map((row, index) => (
-                  <TableRow key={`${row.id ?? index}`}>
+                  <TableRow
+                    key={`${row.id ?? index}`}
+                    hover
+                    onContextMenu={(event) => handleContextMenu(event, row)}
+                    sx={{ cursor: 'context-menu' }}
+                  >
                     <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                       <Typography variant="body2" fontWeight={600}>
                         {row.candidate || 'Unknown'}
@@ -1180,6 +1248,45 @@ const OptimisationsPage = () => {
           </TableContainer>
         </Stack>
       </Paper>
+
+      <Menu
+        open={Boolean(contextMenu)}
+        onClose={handleMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem disabled={!selectedJobId} onClick={handleShowJob}>
+          Show job
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowCandidate(false)}
+        >
+          Show candidate
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowCandidate(true)}
+        >
+          Show resume
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowApplication('')}
+        >
+          Show application
+        </MenuItem>
+        <MenuItem
+          disabled={typeof contextMenu?.row?.id !== 'number'}
+          onClick={() => handleShowApplication('/appraisal')}
+        >
+          Show appraisal
+        </MenuItem>
+      </Menu>
     </Stack>
   )
 }

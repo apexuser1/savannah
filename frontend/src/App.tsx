@@ -19,7 +19,13 @@ import MenuIcon from '@mui/icons-material/Menu'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import PsychologyAltIcon from '@mui/icons-material/PsychologyAlt'
 import TuneIcon from '@mui/icons-material/Tune'
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import {
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  type Location
+} from 'react-router-dom'
 import DashboardPage from './pages/DashboardPage'
 import WhatIfPage from './pages/WhatIfPage'
 import OptimisationsPage from './pages/OptimisationsPage'
@@ -39,36 +45,38 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const state = location.state as { backgroundLocation?: Location } | null
+  const routeLocation = state?.backgroundLocation || location
 
   const activeIndex = useMemo(() => {
-    if (location.pathname.startsWith('/what-if')) {
+    if (routeLocation.pathname.startsWith('/what-if')) {
       return 1
     }
-    if (location.pathname.startsWith('/optimisations')) {
+    if (routeLocation.pathname.startsWith('/optimisations')) {
       return 2
     }
     return 0
-  }, [location.pathname])
+  }, [routeLocation.pathname])
 
   const title = useMemo(() => {
-    if (location.pathname.startsWith('/what-if')) {
+    if (routeLocation.pathname.startsWith('/what-if')) {
       return 'What-If Scenarios'
     }
-    if (location.pathname.startsWith('/optimisations')) {
+    if (routeLocation.pathname.startsWith('/optimisations')) {
       return 'Optimisations'
     }
     return 'Dashboard'
-  }, [location.pathname])
+  }, [routeLocation.pathname])
 
   const subtitle = useMemo(() => {
-    if (location.pathname.startsWith('/what-if')) {
+    if (routeLocation.pathname.startsWith('/what-if')) {
       return 'Define scenarios, run evaluations, and apply score deltas'
     }
-    if (location.pathname.startsWith('/optimisations')) {
+    if (routeLocation.pathname.startsWith('/optimisations')) {
       return 'Explore relaxations and candidate targets'
     }
     return 'Jobs, applications, and scenario filters'
-  }, [location.pathname])
+  }, [routeLocation.pathname])
 
   const handleDrawerToggle = () => {
     setMobileOpen((open) => !open)
@@ -170,7 +178,7 @@ function App() {
         }}
       >
         <Toolbar />
-        <Routes>
+        <Routes location={routeLocation}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/jobs/:jobId" element={<DashboardPage />} />
           <Route path="/applications/:applicationId" element={<DashboardPage />} />
