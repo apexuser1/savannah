@@ -175,6 +175,7 @@ function App() {
           <Route path="/jobs/:jobId" element={<DashboardPage />} />
           <Route path="/applications/:applicationId" element={<DashboardPage />} />
           <Route path="/applications/:applicationId/appraisal" element={<DashboardPage />} />
+          <Route path="/candidates/:candidateId/resume" element={<DashboardPage />} />
           <Route path="/candidates/:candidateId" element={<DashboardPage />} />
           <Route path="/what-if" element={<WhatIfPage />} />
           <Route path="/optimisations" element={<OptimisationsPage />} />

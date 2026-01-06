@@ -650,6 +650,18 @@ const DashboardPage = () => {
           Show candidate
         </MenuItem>
         <MenuItem
+          disabled={!contextMenu?.application?.candidate_id}
+          onClick={() => {
+            const candidateIdValue = contextMenu?.application?.candidate_id
+            if (candidateIdValue) {
+              navigate(`/candidates/${candidateIdValue}/resume`)
+            }
+            handleMenuClose()
+          }}
+        >
+          Show resume
+        </MenuItem>
+        <MenuItem
           disabled={!contextMenu?.application?.id}
           onClick={() => {
             const applicationIdValue = contextMenu?.application?.id
